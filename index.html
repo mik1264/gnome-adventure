@@ -1,0 +1,745 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D Bomb Field Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .controls {
+            padding: 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .control-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .control-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-item label {
+            font-weight: 600;
+            color: #495057;
+            font-size: 0.9em;
+        }
+
+        .control-item input {
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 1em;
+            width: 100px;
+            text-align: center;
+            transition: border-color 0.3s;
+        }
+
+        .control-item input:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 123, 255, 0.4);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(108, 117, 125, 0.4);
+        }
+
+        .results {
+            padding: 30px;
+        }
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #007bff;
+        }
+
+        .stat-label {
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+
+        .field-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 30px;
+            justify-content: center;
+        }
+
+        .field-display {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            min-width: 300px;
+        }
+
+        .field-title {
+            text-align: center;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        .field-grid {
+            display: grid;
+            gap: 2px;
+            background: #dee2e6;
+            border-radius: 8px;
+            padding: 10px;
+            margin: 0 auto;
+        }
+
+        .field-cell {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9em;
+            border-radius: 3px;
+            transition: transform 0.2s;
+        }
+
+        .field-cell:hover {
+            transform: scale(1.1);
+        }
+
+        .cell-empty {
+            background: #f8f9fa;
+            color: #6c757d;
+        }
+
+        .cell-bomb {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .cell-flower {
+            background: #ff69b4;
+            color: white;
+        }
+
+        .cell-gnome {
+            background: #90EE90;
+            color: #2e7d32;
+            animation: gnomeWalk 0.5s ease-in-out infinite alternate;
+            position: relative;
+        }
+
+        .cell-gnome.collecting {
+            background: #FFD700;
+            animation: gnomeCollect 0.3s ease-in-out;
+        }
+
+        .cell-gnome.exploding {
+            background: #FF4500;
+            animation: gnomeExplode 0.6s ease-in-out;
+        }
+
+        .cell-gnome.dead {
+            background: #696969;
+            animation: none;
+            transform: rotate(45deg);
+        }
+
+        @keyframes gnomeWalk {
+            0% { transform: scale(1) rotate(-2deg); }
+            100% { transform: scale(1.1) rotate(2deg); }
+        }
+
+        @keyframes gnomeCollect {
+            0% { transform: scale(1); background: #90EE90; }
+            50% { transform: scale(1.3); background: #FFD700; }
+            100% { transform: scale(1); background: #90EE90; }
+        }
+
+        @keyframes gnomeExplode {
+            0% { transform: scale(1); background: #90EE90; }
+            25% { transform: scale(1.2); background: #FF4500; }
+            50% { transform: scale(1.5); background: #FF0000; }
+            75% { transform: scale(1.2); background: #FF4500; }
+            100% { transform: scale(1); background: #696969; }
+        }
+
+
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #f5c6cb;
+        }
+
+        .game-message {
+            font-size: 1.3em;
+            font-weight: bold;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            text-align: center;
+            display: none;
+        }
+
+        .game-message.win {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .game-message.lose {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        @media (max-width: 768px) {
+            .control-group {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .field-container {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .field-display {
+                min-width: unset;
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💣🌸🧙‍♂️ Interactive Gnome Adventure</h1>
+            <p>Watch the gnome collect flowers and avoid bombs in this magical field!</p>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <div class="control-item">
+                    <label for="fieldSize">Field Size</label>
+                    <input type="number" id="fieldSize" min="3" max="20" value="10">
+                </div>
+                <div class="control-item">
+                    <label for="numBombs">Number of Bombs</label>
+                    <input type="number" id="numBombs" min="0" max="100" value="8">
+                </div>
+                <div class="control-item">
+                    <label for="numFlowers">Number of Flowers</label>
+                    <input type="number" id="numFlowers" min="0" max="100" value="7">
+                </div>
+            </div>
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="generateField()">Generate Field</button>
+                <button class="btn btn-secondary" onclick="generateMultiple()">Generate Examples</button>
+            </div>
+        </div>
+
+        <div class="results" id="results" style="display: none;">
+            <div class="stats" id="stats"></div>
+            <div class="field-container" id="fieldContainer"></div>
+            <div class="game-message" id="gameMessage" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables for gnome
+        let gnomePosition = { row: 0, col: 0 };
+        let gnomeTimer = null;
+        let currentField = null;
+        let currentFieldSize = 0;
+        let gnomeHealth = 3;
+        let flowersCollected = 0;
+        let gnomeStatus = 'happy'; // 'happy', 'collecting', 'exploding', 'dead'
+
+        // Bomb and flower field generation logic
+        function createBombField(size, numBombs, numFlowers) {
+            const totalItems = numBombs + numFlowers;
+            if (totalItems > size * size) {
+                throw new Error(`Total items (${totalItems}) cannot exceed field size (${size * size})`);
+            }
+
+            // Initialize empty field
+            const field = Array(size).fill().map(() => Array(size).fill(0));
+
+            // Create list of all possible positions
+            const positions = [];
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    positions.push([i, j]);
+                }
+            }
+
+            // Randomly select positions for bombs
+            const bombPositions = [];
+            for (let i = 0; i < numBombs; i++) {
+                const randomIndex = Math.floor(Math.random() * positions.length);
+                bombPositions.push(positions.splice(randomIndex, 1)[0]);
+            }
+
+            // Place bombs in selected positions
+            bombPositions.forEach(([row, col]) => {
+                field[row][col] = 1; // 1 = bomb
+            });
+
+            // Randomly select positions for flowers
+            const flowerPositions = [];
+            for (let i = 0; i < numFlowers; i++) {
+                const randomIndex = Math.floor(Math.random() * positions.length);
+                flowerPositions.push(positions.splice(randomIndex, 1)[0]);
+            }
+
+            // Place flowers in selected positions
+            flowerPositions.forEach(([row, col]) => {
+                field[row][col] = 2; // 2 = flower
+            });
+
+            // Place gnome at random position
+            gnomePosition = {
+                row: Math.floor(Math.random() * size),
+                col: Math.floor(Math.random() * size)
+            };
+
+            return field;
+        }
+
+        function moveGnome() {
+            if (!currentField || currentFieldSize === 0 || gnomeStatus === 'dead') return;
+
+            // Get possible moves (adjacent cells)
+            const moves = [
+                { row: -1, col: 0 },  // up
+                { row: 1, col: 0 },   // down
+                { row: 0, col: -1 },  // left
+                { row: 0, col: 1 },   // right
+                { row: -1, col: -1 }, // up-left
+                { row: -1, col: 1 },  // up-right
+                { row: 1, col: -1 },  // down-left
+                { row: 1, col: 1 }    // down-right
+            ];
+
+            // Filter valid moves (within bounds)
+            const validMoves = moves.filter(move => {
+                const newRow = gnomePosition.row + move.row;
+                const newCol = gnomePosition.col + move.col;
+                return newRow >= 0 && newRow < currentFieldSize && 
+                       newCol >= 0 && newCol < currentFieldSize;
+            });
+
+            // If no valid moves, stay in place
+            if (validMoves.length === 0) return;
+
+            // Pick a random valid move
+            const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+            gnomePosition.row += randomMove.row;
+            gnomePosition.col += randomMove.col;
+
+            // Handle interactions with what's under the gnome
+            handleGnomeInteraction();
+
+            // Update the visual field
+            updateFieldDisplay();
+        }
+
+        function handleGnomeInteraction() {
+            const cellContent = currentField[gnomePosition.row][gnomePosition.col];
+            
+            if (cellContent === 2) { // Flower
+                gnomeStatus = 'collecting';
+                flowersCollected++;
+                // Remove the flower from the field
+                currentField[gnomePosition.row][gnomePosition.col] = 0;
+                
+                // Reset status after animation
+                setTimeout(() => {
+                    gnomeStatus = 'happy';
+                    updateFieldDisplay();
+                    
+                    // Check if all flowers collected
+                    const remainingFlowers = currentField.flat().filter(cell => cell === 2).length;
+                    if (remainingFlowers === 0) {
+                        showGameMessage('🎉 Victory! The gnome collected all flowers!', 'win');
+                        stopGnomeMovement();
+                    }
+                }, 300);
+                
+            } else if (cellContent === 1) { // Bomb
+                gnomeStatus = 'exploding';
+                gnomeHealth--;
+                
+                if (gnomeHealth <= 0) {
+                    // Gnome dies
+                    setTimeout(() => {
+                        gnomeStatus = 'dead';
+                        updateFieldDisplay();
+                        stopGnomeMovement();
+                        showGameMessage('💀 Game Over! The gnome died from too many explosions!', 'lose');
+                    }, 600);
+                } else {
+                    // Gnome survives but is hurt, respawn elsewhere
+                    setTimeout(() => {
+                        respawnGnome();
+                        gnomeStatus = 'happy';
+                        updateFieldDisplay();
+                    }, 600);
+                }
+            } else {
+                gnomeStatus = 'happy';
+            }
+        }
+
+        function showGameMessage(message, type) {
+            const messageElement = document.getElementById('gameMessage');
+            if (!messageElement) {
+                // Create message element if it doesn't exist
+                const newMessage = document.createElement('div');
+                newMessage.id = 'gameMessage';
+                newMessage.className = `game-message ${type}`;
+                newMessage.textContent = message;
+                document.querySelector('.results').appendChild(newMessage);
+            } else {
+                messageElement.className = `game-message ${type}`;
+                messageElement.textContent = message;
+                messageElement.style.display = 'block';
+            }
+        }
+
+        function respawnGnome() {
+            // Find a safe spot to respawn (not on a bomb)
+            let attempts = 0;
+            do {
+                gnomePosition.row = Math.floor(Math.random() * currentFieldSize);
+                gnomePosition.col = Math.floor(Math.random() * currentFieldSize);
+                attempts++;
+            } while (currentField[gnomePosition.row][gnomePosition.col] === 1 && attempts < 100);
+        }
+
+        function updateFieldDisplay() {
+            const fieldContainer = document.getElementById('fieldContainer');
+            if (!fieldContainer || !currentField) return;
+
+            // Re-render the field with the new gnome position
+            fieldContainer.innerHTML = '';
+            const fieldDisplay = renderField(currentField, 'Bomb & Flower Field');
+            fieldContainer.appendChild(fieldDisplay);
+            
+            // Update stats to show current gnome status
+            const bombCount = currentField.flat().filter(cell => cell === 1).length;
+            const flowerCount = currentField.flat().filter(cell => cell === 2).length;
+            showStats(currentFieldSize, bombCount, flowerCount);
+        }
+
+        function startGnomeMovement() {
+            clearInterval(gnomeTimer);
+            gnomeTimer = setInterval(moveGnome, 800); // Move every 800ms
+        }
+
+        function stopGnomeMovement() {
+            clearInterval(gnomeTimer);
+            gnomeTimer = null;
+        }
+
+        function renderField(field, title) {
+            const size = field.length;
+
+            const fieldDisplay = document.createElement('div');
+            fieldDisplay.className = 'field-display';
+
+            const fieldTitle = document.createElement('div');
+            fieldTitle.className = 'field-title';
+            fieldTitle.textContent = title;
+            fieldDisplay.appendChild(fieldTitle);
+
+            const fieldGrid = document.createElement('div');
+            fieldGrid.className = 'field-grid';
+            fieldGrid.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'field-cell';
+
+                    // Check if gnome is at this position
+                    if (gnomePosition.row === i && gnomePosition.col === j) {
+                        cell.className += ` cell-gnome ${gnomeStatus}`;
+                        if (gnomeStatus === 'dead') {
+                            cell.textContent = '💀';
+                        } else if (gnomeStatus === 'exploding') {
+                            cell.textContent = '💥';
+                        } else if (gnomeStatus === 'collecting') {
+                            cell.textContent = '🌟';
+                        } else {
+                            cell.textContent = '🧙‍♂️';
+                        }
+                    } else if (field[i][j] === 1) {
+                        cell.className += ' cell-bomb';
+                        cell.textContent = '💣';
+                    } else if (field[i][j] === 2) {
+                        cell.className += ' cell-flower';
+                        cell.textContent = '🌸';
+                    } else {
+                        cell.className += ' cell-empty';
+                        cell.textContent = '';
+                    }
+
+                    fieldGrid.appendChild(cell);
+                }
+            }
+
+            fieldDisplay.appendChild(fieldGrid);
+            return fieldDisplay;
+        }
+
+        function showStats(size, numBombs, numFlowers) {
+            const totalCells = size * size;
+            const totalItems = numBombs + numFlowers;
+            const density = ((totalItems / totalCells) * 100).toFixed(1);
+
+            const statsHTML = `
+                <div class="stat-item">
+                    <div class="stat-value">${size}×${size}</div>
+                    <div class="stat-label">Field Size</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">💣 ${numBombs}</div>
+                    <div class="stat-label">Bombs</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">🌸 ${numFlowers}</div>
+                    <div class="stat-label">Flowers</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">❤️ ${gnomeHealth}</div>
+                    <div class="stat-label">Gnome Health</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">🏆 ${flowersCollected}</div>
+                    <div class="stat-label">Collected</div>
+                </div>
+            `;
+
+            document.getElementById('stats').innerHTML = statsHTML;
+        }
+
+        function showError(message) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.textContent = message;
+            
+            const results = document.getElementById('results');
+            results.style.display = 'block';
+            results.innerHTML = '';
+            results.appendChild(errorDiv);
+        }
+
+        function generateField() {
+            const size = parseInt(document.getElementById('fieldSize').value);
+            const numBombs = parseInt(document.getElementById('numBombs').value);
+            const numFlowers = parseInt(document.getElementById('numFlowers').value);
+
+            // Validation
+            if (size < 3 || size > 20) {
+                showError('Field size must be between 3 and 20');
+                return;
+            }
+
+            if (numBombs < 0 || numFlowers < 0) {
+                showError('Number of bombs and flowers must be non-negative');
+                return;
+            }
+
+            if (numBombs + numFlowers > size * size) {
+                showError(`Total items (${numBombs + numFlowers}) cannot exceed field size (${size * size})`);
+                return;
+            }
+
+            try {
+                const bombField = createBombField(size, numBombs, numFlowers);
+                
+                // Reset gnome stats for new game
+                gnomeHealth = 3;
+                flowersCollected = 0;
+                gnomeStatus = 'happy';
+                
+                // Store current field for gnome movement
+                currentField = bombField;
+                currentFieldSize = size;
+                
+                const results = document.getElementById('results');
+                results.style.display = 'block';
+                
+                // Hide any previous game messages
+                const gameMessage = document.getElementById('gameMessage');
+                if (gameMessage) {
+                    gameMessage.style.display = 'none';
+                }
+                
+                showStats(size, numBombs, numFlowers);
+                
+                const fieldContainer = document.getElementById('fieldContainer');
+                fieldContainer.innerHTML = '';
+                
+                // Show bomb & flower field
+                const bombFieldDisplay = renderField(bombField, 'Bomb & Flower Field');
+                fieldContainer.appendChild(bombFieldDisplay);
+                
+                // Start gnome movement
+                startGnomeMovement();
+                
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+
+        function generateMultiple() {
+            const configurations = [
+                { size: 5, bombs: 3, flowers: 2, title: '5×5 Easy' },
+                { size: 8, bombs: 6, flowers: 4, title: '8×8 Medium' },
+                { size: 12, bombs: 12, flowers: 8, title: '12×12 Hard' }
+            ];
+
+            // Stop gnome movement for multiple field view
+            stopGnomeMovement();
+            currentField = null;
+            currentFieldSize = 0;
+
+            const results = document.getElementById('results');
+            results.style.display = 'block';
+            
+            // Clear previous results
+            document.getElementById('stats').innerHTML = '';
+            const fieldContainer = document.getElementById('fieldContainer');
+            fieldContainer.innerHTML = '';
+
+            configurations.forEach(config => {
+                try {
+                    const bombField = createBombField(config.size, config.bombs, config.flowers);
+                    const totalItems = config.bombs + config.flowers;
+                    const density = ((totalItems / (config.size * config.size)) * 100).toFixed(1);
+                    const title = `${config.title} (💣${config.bombs} 🌸${config.flowers}, ${density}%)`;
+                    
+                    const fieldDisplay = renderField(bombField, title);
+                    fieldContainer.appendChild(fieldDisplay);
+                } catch (error) {
+                    console.error(`Error generating ${config.title}:`, error);
+                }
+            });
+        }
+
+        // Initialize with default field on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            generateField();
+        });
+
+        // Allow Enter key to generate field
+        document.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                generateField();
+            }
+        });
+    </script>
+</body>
+</html> 

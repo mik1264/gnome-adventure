@@ -381,36 +381,80 @@
         let gameScore = 0;
         let bombsHit = 0;
 
-        // Leaderboard functions
-        function getLeaderboard() {
-            const saved = localStorage.getItem('gnomeAdventureLeaderboard');
-            return saved ? JSON.parse(saved) : [];
+        // Cloud database configuration
+        const API_BASE_URL = 'http://localhost:3000/api';
+
+        // Leaderboard functions (now using cloud database)
+        async function getLeaderboard() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/leaderboard`);
+                if (!response.ok) throw new Error('Failed to fetch leaderboard');
+                return await response.json();
+            } catch (error) {
+                console.error('Error fetching leaderboard:', error);
+                // Fallback to local storage if API fails
+                const saved = localStorage.getItem('gnomeAdventureLeaderboard');
+                return saved ? JSON.parse(saved) : [];
+            }
         }
 
-        function saveScore(playerName, score, details) {
-            const leaderboard = getLeaderboard();
-            const newEntry = {
-                id: Date.now(),
-                playerName: playerName,
-                score: score,
-                fieldSize: details.fieldSize,
-                flowersCollected: details.flowersCollected,
-                totalFlowers: details.totalFlowers,
-                bombsHit: details.bombsHit,
-                timeTaken: details.timeTaken,
-                finalHealth: details.finalHealth,
-                timestamp: new Date().toISOString(),
-                won: details.won
-            };
-            
-            leaderboard.push(newEntry);
-            leaderboard.sort((a, b) => b.score - a.score);
-            
-            // Keep only top 10 scores
-            const topScores = leaderboard.slice(0, 10);
-            localStorage.setItem('gnomeAdventureLeaderboard', JSON.stringify(topScores));
-            
-            return newEntry;
+        async function saveScore(playerName, score, details) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/leaderboard`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        player_name: playerName,
+                        score: score,
+                        field_size: details.fieldSize,
+                        flowers_collected: details.flowersCollected,
+                        total_flowers: details.totalFlowers,
+                        bombs_hit: details.bombsHit,
+                        time_taken: details.timeTaken,
+                        final_health: details.finalHealth,
+                        won: details.won
+                    })
+                });
+                
+                if (!response.ok) throw new Error('Failed to save score');
+                
+                const result = await response.json();
+                return {
+                    entry: result.entry,
+                    rank: result.rank
+                };
+            } catch (error) {
+                console.error('Error saving score:', error);
+                // Fallback to local storage if API fails
+                const leaderboard = await getLeaderboard();
+                const newEntry = {
+                    id: Date.now(),
+                    player_name: playerName,
+                    score: score,
+                    field_size: details.fieldSize,
+                    flowers_collected: details.flowersCollected,
+                    total_flowers: details.totalFlowers,
+                    bombs_hit: details.bombsHit,
+                    time_taken: details.timeTaken,
+                    final_health: details.finalHealth,
+                    created_at: new Date().toISOString(),
+                    won: details.won
+                };
+                
+                leaderboard.push(newEntry);
+                leaderboard.sort((a, b) => b.score - a.score);
+                
+                // Keep only top 10 scores
+                const topScores = leaderboard.slice(0, 10);
+                localStorage.setItem('gnomeAdventureLeaderboard', JSON.stringify(topScores));
+                
+                return {
+                    entry: newEntry,
+                    rank: leaderboard.findIndex(entry => entry.id === newEntry.id) + 1
+                };
+            }
         }
 
         function calculateScore(won, flowersCollected, totalFlowers, timeTaken, finalHealth, fieldSize, bombsHit) {
@@ -478,61 +522,98 @@
             gameMessage.appendChild(submissionForm);
         }
 
-        function submitScore() {
+        async function submitScore() {
             const playerName = document.getElementById('playerNameInput').value.trim();
             if (!playerName) {
                 alert('Please enter your name!');
                 return;
             }
             
-            const scoreDetails = {
-                fieldSize: currentFieldSize,
-                flowersCollected: flowersCollected,
-                totalFlowers: totalFlowers,
-                bombsHit: bombsHit,
-                timeTaken: Math.floor((gameEndTime - gameStartTime) / 1000),
-                finalHealth: gnomeHealth,
-                won: flowersCollected === totalFlowers
-            };
+            // Show loading state
+            const submitButton = document.querySelector('button[onclick="submitScore()"]');
+            const originalText = submitButton.textContent;
+            submitButton.textContent = 'Submitting...';
+            submitButton.disabled = true;
             
-            const newEntry = saveScore(playerName, gameScore, scoreDetails);
-            
-            alert(`Score submitted! You ranked #${getLeaderboard().findIndex(entry => entry.id === newEntry.id) + 1} on the leaderboard!`);
-            
-            // Show leaderboard
-            viewLeaderboard();
+            try {
+                const scoreDetails = {
+                    fieldSize: currentFieldSize,
+                    flowersCollected: flowersCollected,
+                    totalFlowers: totalFlowers,
+                    bombsHit: bombsHit,
+                    timeTaken: Math.floor((gameEndTime - gameStartTime) / 1000),
+                    finalHealth: gnomeHealth,
+                    won: flowersCollected === totalFlowers
+                };
+                
+                const result = await saveScore(playerName, gameScore, scoreDetails);
+                
+                alert(`Score submitted! You ranked #${result.rank} on the leaderboard!`);
+                
+                // Show leaderboard
+                await viewLeaderboard();
+            } catch (error) {
+                console.error('Error submitting score:', error);
+                alert('Error submitting score. Please try again.');
+            } finally {
+                submitButton.textContent = originalText;
+                submitButton.disabled = false;
+            }
         }
 
-        function viewLeaderboard() {
-            const leaderboard = getLeaderboard();
+        async function viewLeaderboard() {
             const gameMessage = document.getElementById('gameMessage');
             if (!gameMessage) return;
             
+            // Show loading state
             let leaderboardHTML = '<div style="margin-top: 20px;"><h3>🏆 Leaderboard</h3>';
-            
-            if (leaderboard.length === 0) {
-                leaderboardHTML += '<p>No scores yet! Be the first to submit a score!</p>';
-            } else {
-                leaderboardHTML += '<div style="max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin: 10px 0;">';
-                leaderboard.forEach((entry, index) => {
-                    const rank = index + 1;
-                    const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
-                    const statusIcon = entry.won ? '🏆' : '💀';
-                    leaderboardHTML += `
-                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px; border-bottom: 1px solid #eee;">
-                            <span>${medal} ${entry.playerName}</span>
-                            <span>${statusIcon} ${entry.score} pts</span>
-                            <span style="font-size: 0.8em; color: #666;">${entry.fieldSize}×${entry.fieldSize} | ${entry.flowersCollected}/${entry.totalFlowers} flowers | ${entry.timeTaken}s</span>
-                        </div>
-                    `;
-                });
-                leaderboardHTML += '</div>';
-            }
-            
-            leaderboardHTML += '<button onclick="closeLeaderboard()" style="padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>';
+            leaderboardHTML += '<p>Loading leaderboard...</p>';
             leaderboardHTML += '</div>';
-            
             gameMessage.innerHTML = gameMessage.innerHTML.replace(/<div style="margin-top: 20px;">.*?<\/div>$/s, '') + leaderboardHTML;
+            
+            try {
+                const leaderboard = await getLeaderboard();
+                
+                leaderboardHTML = '<div style="margin-top: 20px;"><h3>🏆 Global Leaderboard</h3>';
+                
+                if (leaderboard.length === 0) {
+                    leaderboardHTML += '<p>No scores yet! Be the first to submit a score!</p>';
+                } else {
+                    leaderboardHTML += '<div style="max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin: 10px 0;">';
+                    leaderboard.forEach((entry, index) => {
+                        const rank = index + 1;
+                        const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
+                        const statusIcon = entry.won ? '🏆' : '💀';
+                        const playerName = entry.player_name || entry.playerName;
+                        const fieldSize = entry.field_size || entry.fieldSize;
+                        const flowersCollected = entry.flowers_collected || entry.flowersCollected;
+                        const totalFlowers = entry.total_flowers || entry.totalFlowers;
+                        const timeTaken = entry.time_taken || entry.timeTaken;
+                        
+                        leaderboardHTML += `
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px; border-bottom: 1px solid #eee;">
+                                <span>${medal} ${playerName}</span>
+                                <span>${statusIcon} ${entry.score} pts</span>
+                                <span style="font-size: 0.8em; color: #666;">${fieldSize}×${fieldSize} | ${flowersCollected}/${totalFlowers} flowers | ${timeTaken}s</span>
+                            </div>
+                        `;
+                    });
+                    leaderboardHTML += '</div>';
+                }
+                
+                leaderboardHTML += '<button onclick="closeLeaderboard()" style="padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>';
+                leaderboardHTML += '</div>';
+                
+                gameMessage.innerHTML = gameMessage.innerHTML.replace(/<div style="margin-top: 20px;">.*?<\/div>$/s, '') + leaderboardHTML;
+            } catch (error) {
+                console.error('Error loading leaderboard:', error);
+                leaderboardHTML = '<div style="margin-top: 20px;"><h3>🏆 Leaderboard</h3>';
+                leaderboardHTML += '<p style="color: red;">Error loading leaderboard. Please try again.</p>';
+                leaderboardHTML += '<button onclick="closeLeaderboard()" style="padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>';
+                leaderboardHTML += '</div>';
+                
+                gameMessage.innerHTML = gameMessage.innerHTML.replace(/<div style="margin-top: 20px;">.*?<\/div>$/s, '') + leaderboardHTML;
+            }
         }
 
         function closeLeaderboard() {
@@ -542,48 +623,59 @@
             }
         }
 
-        function showMainLeaderboard() {
+        async function showMainLeaderboard() {
             const results = document.getElementById('results');
             results.style.display = 'block';
-            results.innerHTML = '';
+            results.innerHTML = '<div style="padding: 20px; text-align: center;"><h2>🏆 Global Gnome Adventure Leaderboard</h2><p>Loading leaderboard...</p></div>';
             
-            const leaderboard = getLeaderboard();
-            
-            let leaderboardHTML = '<div style="padding: 20px; text-align: center;"><h2>🏆 Gnome Adventure Leaderboard</h2>';
-            
-            if (leaderboard.length === 0) {
-                leaderboardHTML += '<p style="font-size: 1.2em; color: #666;">No scores yet! Play a game to be the first on the leaderboard!</p>';
-            } else {
-                leaderboardHTML += '<div style="max-width: 800px; margin: 0 auto; border: 1px solid #ccc; border-radius: 8px; overflow: hidden;">';
-                leaderboardHTML += '<div style="background: #f8f9fa; padding: 10px; border-bottom: 2px solid #007bff; font-weight: bold; display: flex; justify-content: space-between;"><span>Rank & Player</span><span>Score</span><span>Details</span></div>';
-                leaderboard.forEach((entry, index) => {
-                    const rank = index + 1;
-                    const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
-                    const statusIcon = entry.won ? '🏆' : '💀';
-                    const date = new Date(entry.timestamp).toLocaleDateString();
-                    leaderboardHTML += `
-                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; ${rank <= 3 ? 'background: #f8f9fa;' : ''}">
-                            <div style="text-align: left;">
-                                <div style="font-weight: bold;">${medal} ${entry.playerName}</div>
-                                <div style="font-size: 0.8em; color: #666;">${date}</div>
+            try {
+                const leaderboard = await getLeaderboard();
+                
+                let leaderboardHTML = '<div style="padding: 20px; text-align: center;"><h2>🏆 Global Gnome Adventure Leaderboard</h2>';
+                
+                if (leaderboard.length === 0) {
+                    leaderboardHTML += '<p style="font-size: 1.2em; color: #666;">No scores yet! Play a game to be the first on the leaderboard!</p>';
+                } else {
+                    leaderboardHTML += '<div style="max-width: 800px; margin: 0 auto; border: 1px solid #ccc; border-radius: 8px; overflow: hidden;">';
+                    leaderboardHTML += '<div style="background: #f8f9fa; padding: 10px; border-bottom: 2px solid #007bff; font-weight: bold; display: flex; justify-content: space-between;"><span>Rank & Player</span><span>Score</span><span>Details</span></div>';
+                    leaderboard.forEach((entry, index) => {
+                        const rank = index + 1;
+                        const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
+                        const statusIcon = entry.won ? '🏆' : '💀';
+                        const playerName = entry.player_name || entry.playerName;
+                        const fieldSize = entry.field_size || entry.fieldSize;
+                        const flowersCollected = entry.flowers_collected || entry.flowersCollected;
+                        const totalFlowers = entry.total_flowers || entry.totalFlowers;
+                        const timeTaken = entry.time_taken || entry.timeTaken;
+                        const date = new Date(entry.created_at || entry.timestamp).toLocaleDateString();
+                        
+                        leaderboardHTML += `
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; ${rank <= 3 ? 'background: #f8f9fa;' : ''}">
+                                <div style="text-align: left;">
+                                    <div style="font-weight: bold;">${medal} ${playerName}</div>
+                                    <div style="font-size: 0.8em; color: #666;">${date}</div>
+                                </div>
+                                <div style="text-align: center; font-weight: bold; color: #007bff;">
+                                    ${statusIcon} ${entry.score} pts
+                                </div>
+                                <div style="text-align: right; font-size: 0.9em; color: #666;">
+                                    <div>${fieldSize}×${fieldSize} field</div>
+                                    <div>${flowersCollected}/${totalFlowers} flowers | ${timeTaken}s</div>
+                                </div>
                             </div>
-                            <div style="text-align: center; font-weight: bold; color: #007bff;">
-                                ${statusIcon} ${entry.score} pts
-                            </div>
-                            <div style="text-align: right; font-size: 0.9em; color: #666;">
-                                <div>${entry.fieldSize}×${entry.fieldSize} field</div>
-                                <div>${entry.flowersCollected}/${entry.totalFlowers} flowers | ${entry.timeTaken}s</div>
-                            </div>
-                        </div>
-                    `;
-                });
+                        `;
+                    });
+                    leaderboardHTML += '</div>';
+                }
+                
+                leaderboardHTML += '<button onclick="closeMainLeaderboard()" style="padding: 12px 24px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 20px;">Close</button>';
                 leaderboardHTML += '</div>';
+                
+                results.innerHTML = leaderboardHTML;
+            } catch (error) {
+                console.error('Error loading leaderboard:', error);
+                results.innerHTML = '<div style="padding: 20px; text-align: center;"><h2>🏆 Global Gnome Adventure Leaderboard</h2><p style="color: red;">Error loading leaderboard. Please try again.</p><button onclick="closeMainLeaderboard()" style="padding: 12px 24px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 20px;">Close</button></div>';
             }
-            
-            leaderboardHTML += '<button onclick="closeMainLeaderboard()" style="padding: 12px 24px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 20px;">Close</button>';
-            leaderboardHTML += '</div>';
-            
-            results.innerHTML = leaderboardHTML;
         }
 
         function closeMainLeaderboard() {

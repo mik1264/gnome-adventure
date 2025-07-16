@@ -352,6 +352,7 @@
             <div class="button-group">
                 <button class="btn btn-primary" onclick="generateField()">Generate Field</button>
                 <button class="btn btn-secondary" onclick="generateMultiple()">Generate Examples</button>
+                <button class="btn btn-secondary" onclick="showMainLeaderboard()">View Leaderboard</button>
             </div>
         </div>
 
@@ -371,6 +372,224 @@
         let gnomeHealth = 3;
         let flowersCollected = 0;
         let gnomeStatus = 'happy'; // 'happy', 'collecting', 'exploding', 'dead'
+        
+        // Game scoring variables
+        let gameStartTime = 0;
+        let gameEndTime = 0;
+        let totalFlowers = 0;
+        let totalBombs = 0;
+        let gameScore = 0;
+        let bombsHit = 0;
+
+        // Leaderboard functions
+        function getLeaderboard() {
+            const saved = localStorage.getItem('gnomeAdventureLeaderboard');
+            return saved ? JSON.parse(saved) : [];
+        }
+
+        function saveScore(playerName, score, details) {
+            const leaderboard = getLeaderboard();
+            const newEntry = {
+                id: Date.now(),
+                playerName: playerName,
+                score: score,
+                fieldSize: details.fieldSize,
+                flowersCollected: details.flowersCollected,
+                totalFlowers: details.totalFlowers,
+                bombsHit: details.bombsHit,
+                timeTaken: details.timeTaken,
+                finalHealth: details.finalHealth,
+                timestamp: new Date().toISOString(),
+                won: details.won
+            };
+            
+            leaderboard.push(newEntry);
+            leaderboard.sort((a, b) => b.score - a.score);
+            
+            // Keep only top 10 scores
+            const topScores = leaderboard.slice(0, 10);
+            localStorage.setItem('gnomeAdventureLeaderboard', JSON.stringify(topScores));
+            
+            return newEntry;
+        }
+
+        function calculateScore(won, flowersCollected, totalFlowers, timeTaken, finalHealth, fieldSize, bombsHit) {
+            let score = 0;
+            
+            // Base score for flowers collected
+            score += flowersCollected * 100;
+            
+            // Bonus for completing the game
+            if (won) {
+                score += 500;
+                
+                // Time bonus (faster is better)
+                const timeBonus = Math.max(0, 300 - timeTaken);
+                score += timeBonus;
+                
+                // Health bonus
+                score += finalHealth * 50;
+                
+                // Field size bonus
+                score += fieldSize * 10;
+            }
+            
+            // Penalty for hitting bombs
+            score -= bombsHit * 25;
+            
+            return Math.max(0, score);
+        }
+
+        function endGame(won) {
+            gameEndTime = Date.now();
+            const timeTaken = Math.floor((gameEndTime - gameStartTime) / 1000); // in seconds
+            
+            gameScore = calculateScore(won, flowersCollected, totalFlowers, timeTaken, gnomeHealth, currentFieldSize, bombsHit);
+            
+            // Show appropriate game message
+            const message = won ? 
+                `🌸 Victory! Score: ${gameScore} points! The gnome collected all flowers in ${timeTaken}s!` :
+                `💀 Game Over! Score: ${gameScore} points! The gnome died after ${timeTaken}s.`;
+            
+            showGameMessage(message, won ? 'win' : 'lose');
+            
+            // Show score submission form
+            setTimeout(() => {
+                showScoreSubmission(won);
+            }, 1000);
+        }
+
+        function showScoreSubmission(won) {
+            const gameMessage = document.getElementById('gameMessage');
+            if (!gameMessage) return;
+            
+            const submissionForm = document.createElement('div');
+            submissionForm.innerHTML = `
+                <div style="margin-top: 20px; text-align: center;">
+                    <h3>🏆 Submit Your Score to Leaderboard</h3>
+                    <p><strong>Your Score: ${gameScore} points</strong></p>
+                    <p>Time: ${Math.floor((gameEndTime - gameStartTime) / 1000)}s | Flowers: ${flowersCollected}/${totalFlowers} | Health: ${gnomeHealth}/3</p>
+                    <input type="text" id="playerNameInput" placeholder="Enter your name" maxlength="20" style="padding: 8px; margin: 10px; border: 1px solid #ccc; border-radius: 4px;">
+                    <br>
+                    <button onclick="submitScore()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; margin: 5px;">Submit Score</button>
+                    <button onclick="viewLeaderboard()" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; margin: 5px;">View Leaderboard</button>
+                </div>
+            `;
+            gameMessage.appendChild(submissionForm);
+        }
+
+        function submitScore() {
+            const playerName = document.getElementById('playerNameInput').value.trim();
+            if (!playerName) {
+                alert('Please enter your name!');
+                return;
+            }
+            
+            const scoreDetails = {
+                fieldSize: currentFieldSize,
+                flowersCollected: flowersCollected,
+                totalFlowers: totalFlowers,
+                bombsHit: bombsHit,
+                timeTaken: Math.floor((gameEndTime - gameStartTime) / 1000),
+                finalHealth: gnomeHealth,
+                won: flowersCollected === totalFlowers
+            };
+            
+            const newEntry = saveScore(playerName, gameScore, scoreDetails);
+            
+            alert(`Score submitted! You ranked #${getLeaderboard().findIndex(entry => entry.id === newEntry.id) + 1} on the leaderboard!`);
+            
+            // Show leaderboard
+            viewLeaderboard();
+        }
+
+        function viewLeaderboard() {
+            const leaderboard = getLeaderboard();
+            const gameMessage = document.getElementById('gameMessage');
+            if (!gameMessage) return;
+            
+            let leaderboardHTML = '<div style="margin-top: 20px;"><h3>🏆 Leaderboard</h3>';
+            
+            if (leaderboard.length === 0) {
+                leaderboardHTML += '<p>No scores yet! Be the first to submit a score!</p>';
+            } else {
+                leaderboardHTML += '<div style="max-height: 300px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin: 10px 0;">';
+                leaderboard.forEach((entry, index) => {
+                    const rank = index + 1;
+                    const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
+                    const statusIcon = entry.won ? '🏆' : '💀';
+                    leaderboardHTML += `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 5px; border-bottom: 1px solid #eee;">
+                            <span>${medal} ${entry.playerName}</span>
+                            <span>${statusIcon} ${entry.score} pts</span>
+                            <span style="font-size: 0.8em; color: #666;">${entry.fieldSize}×${entry.fieldSize} | ${entry.flowersCollected}/${entry.totalFlowers} flowers | ${entry.timeTaken}s</span>
+                        </div>
+                    `;
+                });
+                leaderboardHTML += '</div>';
+            }
+            
+            leaderboardHTML += '<button onclick="closeLeaderboard()" style="padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">Close</button>';
+            leaderboardHTML += '</div>';
+            
+            gameMessage.innerHTML = gameMessage.innerHTML.replace(/<div style="margin-top: 20px;">.*?<\/div>$/s, '') + leaderboardHTML;
+        }
+
+        function closeLeaderboard() {
+            const gameMessage = document.getElementById('gameMessage');
+            if (gameMessage) {
+                gameMessage.style.display = 'none';
+            }
+        }
+
+        function showMainLeaderboard() {
+            const results = document.getElementById('results');
+            results.style.display = 'block';
+            results.innerHTML = '';
+            
+            const leaderboard = getLeaderboard();
+            
+            let leaderboardHTML = '<div style="padding: 20px; text-align: center;"><h2>🏆 Gnome Adventure Leaderboard</h2>';
+            
+            if (leaderboard.length === 0) {
+                leaderboardHTML += '<p style="font-size: 1.2em; color: #666;">No scores yet! Play a game to be the first on the leaderboard!</p>';
+            } else {
+                leaderboardHTML += '<div style="max-width: 800px; margin: 0 auto; border: 1px solid #ccc; border-radius: 8px; overflow: hidden;">';
+                leaderboardHTML += '<div style="background: #f8f9fa; padding: 10px; border-bottom: 2px solid #007bff; font-weight: bold; display: flex; justify-content: space-between;"><span>Rank & Player</span><span>Score</span><span>Details</span></div>';
+                leaderboard.forEach((entry, index) => {
+                    const rank = index + 1;
+                    const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `${rank}.`;
+                    const statusIcon = entry.won ? '🏆' : '💀';
+                    const date = new Date(entry.timestamp).toLocaleDateString();
+                    leaderboardHTML += `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; ${rank <= 3 ? 'background: #f8f9fa;' : ''}">
+                            <div style="text-align: left;">
+                                <div style="font-weight: bold;">${medal} ${entry.playerName}</div>
+                                <div style="font-size: 0.8em; color: #666;">${date}</div>
+                            </div>
+                            <div style="text-align: center; font-weight: bold; color: #007bff;">
+                                ${statusIcon} ${entry.score} pts
+                            </div>
+                            <div style="text-align: right; font-size: 0.9em; color: #666;">
+                                <div>${entry.fieldSize}×${entry.fieldSize} field</div>
+                                <div>${entry.flowersCollected}/${entry.totalFlowers} flowers | ${entry.timeTaken}s</div>
+                            </div>
+                        </div>
+                    `;
+                });
+                leaderboardHTML += '</div>';
+            }
+            
+            leaderboardHTML += '<button onclick="closeMainLeaderboard()" style="padding: 12px 24px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; margin-top: 20px;">Close</button>';
+            leaderboardHTML += '</div>';
+            
+            results.innerHTML = leaderboardHTML;
+        }
+
+        function closeMainLeaderboard() {
+            const results = document.getElementById('results');
+            results.style.display = 'none';
+        }
 
         // Bomb and flower field generation logic
         function createBombField(size, numBombs, numFlowers) {
@@ -483,14 +702,15 @@
                     // Check if all flowers collected
                     const remainingFlowers = currentField.flat().filter(cell => cell === 2).length;
                     if (remainingFlowers === 0) {
-                        showGameMessage('🌸 All flowers collected! The gnome is fully healed and victorious!', 'win');
                         stopGnomeMovement();
+                        endGame(true);
                     }
                 }, 300);
                 
             } else if (cellContent === 1) { // Bomb
                 gnomeStatus = 'exploding';
                 gnomeHealth--;
+                bombsHit++;
                 
                 if (gnomeHealth <= 0) {
                     // Gnome dies
@@ -498,7 +718,7 @@
                         gnomeStatus = 'dead';
                         updateFieldDisplay();
                         stopGnomeMovement();
-                        showGameMessage('💀 Game Over! The gnome died from too many explosions!', 'lose');
+                        endGame(false);
                     }, 600);
                 } else {
                     // Gnome survives but is hurt, respawn elsewhere
@@ -686,6 +906,14 @@
                 gnomeHealth = 3;
                 flowersCollected = 0;
                 gnomeStatus = 'happy';
+                
+                // Initialize scoring variables
+                gameStartTime = Date.now();
+                gameEndTime = 0;
+                totalFlowers = numFlowers;
+                totalBombs = numBombs;
+                gameScore = 0;
+                bombsHit = 0;
                 
                 // Store current field for gnome movement
                 currentField = bombField;

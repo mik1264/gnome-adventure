@@ -22,6 +22,9 @@ A fun browser-based game where you watch a little gnome automatically explore a 
 - **Beautiful animations**: Smooth walking, explosions, and state changes
 - **Customizable fields**: Adjust size, bomb count, and flower count
 - **Strategic gameplay**: Balance risk vs reward - flowers heal but may be near bombs
+- **🏆 Leaderboard System**: Local storage-based scoring and leaderboard with top 10 players
+- **📊 Scoring System**: Points based on flowers collected, time taken, health remaining, and field size
+- **🎯 Competitive Play**: Submit scores, view rankings, and compete with other players
 
 ## Game Controls
 
@@ -29,6 +32,7 @@ A fun browser-based game where you watch a little gnome automatically explore a 
 - **Bomb Count**: Set how many dangerous bombs to place
 - **Flower Count**: Set how many flowers the gnome needs to collect
 - **Generate Field**: Create a new random field and start the adventure
+- **View Leaderboard**: See top 10 player scores and rankings
 
 ## Visual States
 
@@ -36,6 +40,25 @@ A fun browser-based game where you watch a little gnome automatically explore a 
 - 🌟 **Collecting**: Gnome found a flower!
 - 💥 **Exploding**: Gnome hit a bomb!
 - 💀 **Dead**: Game over - gnome ran out of health
+
+## Scoring System
+
+### How Points Are Calculated
+
+- **Base Points**: 100 points per flower collected
+- **Victory Bonus**: 500 points for collecting all flowers
+- **Speed Bonus**: Up to 300 points for faster completion
+- **Health Bonus**: 50 points per remaining health point
+- **Field Size Bonus**: 10 points per field dimension
+- **Bomb Penalty**: -25 points per bomb hit
+
+### Leaderboard Features
+
+- **Local Storage**: Scores saved in your browser
+- **Top 10 Rankings**: Only the best scores are kept
+- **Detailed Stats**: View field size, time taken, flowers collected
+- **Win/Loss Tracking**: See which games were completed successfully
+- **Timestamps**: Track when scores were achieved
 
 ## Play Online
 

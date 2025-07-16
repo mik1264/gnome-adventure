@@ -453,6 +453,11 @@
                 // Remove the flower from the field
                 currentField[gnomePosition.row][gnomePosition.col] = 0;
                 
+                // Heal the gnome (up to maximum of 3 health)
+                if (gnomeHealth < 3) {
+                    gnomeHealth++;
+                }
+                
                 // Reset status after animation
                 setTimeout(() => {
                     gnomeStatus = 'happy';
@@ -461,7 +466,7 @@
                     // Check if all flowers collected
                     const remainingFlowers = currentField.flat().filter(cell => cell === 2).length;
                     if (remainingFlowers === 0) {
-                        showGameMessage('🎉 Victory! The gnome collected all flowers!', 'win');
+                        showGameMessage('🌸 All flowers collected! The gnome is fully healed and victorious!', 'win');
                         stopGnomeMovement();
                     }
                 }, 300);
@@ -617,7 +622,7 @@
                 </div>
                 <div class="stat-item">
                     <div class="stat-value">🏆 ${flowersCollected}</div>
-                    <div class="stat-label">Collected</div>
+                    <div class="stat-label">Flowers Used</div>
                 </div>
             `;
 

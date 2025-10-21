@@ -582,6 +582,7 @@
         let gnomeHealth = 3;
         let flowersCollected = 0;
         let gnomeStatus = 'happy'; // 'happy', 'collecting', 'exploding', 'dead', 'invincible'
+        let stepCounter = 0; // Track how many steps gnome has taken
 
         // Feature 1: Ghost Trail
         let positionHistory = []; // Track last 10 positions with fading effect
@@ -724,6 +725,9 @@
             gnomePosition.row += randomMove.row;
             gnomePosition.col += randomMove.col;
 
+            // Increment step counter
+            stepCounter++;
+
             // Handle interactions with what's under the gnome
             handleGnomeInteraction();
 
@@ -759,7 +763,7 @@
                     // Check if all flowers collected
                     const remainingFlowers = currentField.flat().filter(cell => cell === 2 || cell === 4).length;
                     if (remainingFlowers === 0) {
-                        showGameMessage('🌸 All flowers collected! The gnome is victorious!', 'win');
+                        showGameMessage(`🌸 All flowers collected! The gnome survived ${stepCounter} steps!`, 'win');
                         stopGnomeMovement();
                     }
                 }, 300);
@@ -788,7 +792,7 @@
                         positionHistory = []; // Clear ghost trail on death
                         updateFieldDisplay();
                         stopGnomeMovement();
-                        showGameMessage('💀 Game Over! The gnome died from explosions!', 'lose');
+                        showGameMessage(`💀 Game Over! The gnome survived ${stepCounter} steps before dying.`, 'lose');
                     }, 600);
                 } else {
                     // Gnome survives but is hurt, respawn elsewhere
@@ -858,7 +862,7 @@
                                             positionHistory = []; // Clear ghost trail on death
                                             updateFieldDisplay();
                                             stopGnomeMovement();
-                                            showGameMessage('💀 Game Over! Chain reaction!', 'lose');
+                                            showGameMessage(`💀 Game Over! Chain reaction after ${stepCounter} steps!`, 'lose');
                                         }, 400);
                                     }
                                 }
@@ -1068,6 +1072,10 @@
                     <div class="stat-label">Gnome Health</div>
                 </div>
                 <div class="stat-item">
+                    <div class="stat-value">👣 ${stepCounter}</div>
+                    <div class="stat-label">Steps</div>
+                </div>
+                <div class="stat-item">
                     <div class="stat-value">🏆 ${flowersCollected}</div>
                     <div class="stat-label">Flowers Used</div>
                 </div>
@@ -1119,6 +1127,7 @@
                 gnomeHealth = 3;
                 flowersCollected = 0;
                 gnomeStatus = 'happy';
+                stepCounter = 0;
 
                 // Reset new feature states
                 positionHistory = [];

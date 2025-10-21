@@ -222,11 +222,64 @@
             color: white;
         }
 
+        .cell-phoenix-flower {
+            background: linear-gradient(135deg, #ff6b00 0%, #ff0000 100%);
+            color: white;
+            animation: phoenixGlow 1s ease-in-out infinite alternate;
+            box-shadow: 0 0 10px rgba(255, 107, 0, 0.6);
+        }
+
+        .cell-sage-flower {
+            background: linear-gradient(135deg, #6b5b95 0%, #4a148c 100%);
+            color: white;
+            animation: sageGlow 1s ease-in-out infinite alternate;
+            box-shadow: 0 0 10px rgba(107, 91, 149, 0.6);
+        }
+
+        .cell-rewind-powerup {
+            background: linear-gradient(135deg, #00d4ff 0%, #0066ff 100%);
+            color: white;
+            animation: rewindPulse 1s ease-in-out infinite;
+        }
+
+        .cell-ghost-trail {
+            background: rgba(144, 238, 144, 0.3);
+            position: relative;
+        }
+
+        .cell-ghost-trail::after {
+            content: '👻';
+            opacity: 0.5;
+            font-size: 0.7em;
+        }
+
+        .cell-bomb-revealed {
+            background: #ffcccc;
+            color: #cc0000;
+            border: 2px dashed #ff0000;
+        }
+
+        .cell-bomb-exploding {
+            background: #ff0000;
+            animation: bombExplode 0.5s ease-out;
+        }
+
         .cell-gnome {
             background: #90EE90;
             color: #2e7d32;
             animation: gnomeWalk 0.5s ease-in-out infinite alternate;
             position: relative;
+        }
+
+        .cell-gnome.invincible {
+            background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+            animation: invincibleShield 0.5s ease-in-out infinite alternate;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.8);
+        }
+
+        .cell-gnome.rewinding {
+            background: #00d4ff;
+            animation: rewindEffect 0.5s ease-in-out;
         }
 
         .cell-gnome.collecting {
@@ -262,6 +315,39 @@
             50% { transform: scale(1.5); background: #FF0000; }
             75% { transform: scale(1.2); background: #FF4500; }
             100% { transform: scale(1); background: #696969; }
+        }
+
+        @keyframes phoenixGlow {
+            0% { box-shadow: 0 0 10px rgba(255, 107, 0, 0.6); }
+            100% { box-shadow: 0 0 20px rgba(255, 0, 0, 0.9); }
+        }
+
+        @keyframes sageGlow {
+            0% { box-shadow: 0 0 10px rgba(107, 91, 149, 0.6); }
+            100% { box-shadow: 0 0 20px rgba(74, 20, 140, 0.9); }
+        }
+
+        @keyframes rewindPulse {
+            0% { transform: scale(1); box-shadow: 0 0 5px rgba(0, 212, 255, 0.6); }
+            50% { transform: scale(1.1); box-shadow: 0 0 15px rgba(0, 102, 255, 0.9); }
+            100% { transform: scale(1); box-shadow: 0 0 5px rgba(0, 212, 255, 0.6); }
+        }
+
+        @keyframes invincibleShield {
+            0% { box-shadow: 0 0 15px rgba(255, 215, 0, 0.8); }
+            100% { box-shadow: 0 0 25px rgba(255, 165, 0, 1); }
+        }
+
+        @keyframes rewindEffect {
+            0% { transform: scale(1) rotate(0deg); background: #00d4ff; }
+            50% { transform: scale(1.3) rotate(180deg); background: #0066ff; }
+            100% { transform: scale(1) rotate(360deg); background: #90EE90; }
+        }
+
+        @keyframes bombExplode {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.5); opacity: 1; }
+            100% { transform: scale(2); opacity: 0; }
         }
 
 
@@ -370,11 +456,28 @@
         let currentFieldSize = 0;
         let gnomeHealth = 3;
         let flowersCollected = 0;
-        let gnomeStatus = 'happy'; // 'happy', 'collecting', 'exploding', 'dead'
+        let gnomeStatus = 'happy'; // 'happy', 'collecting', 'exploding', 'dead', 'invincible', 'rewinding'
+
+        // Feature 1: Time Rewind Trail
+        let positionHistory = []; // Track last 10 positions
+        let rewindCharges = 0; // Number of rewind power-ups collected
+        const MAX_HISTORY = 10;
+        const REWIND_STEPS = 5;
+
+        // Feature 2: Chain Reactions
+        let chainReactionInProgress = false;
+        let explodedBombs = new Set(); // Track which bombs have exploded
+
+        // Feature 3: Flower Mutations
+        let invincibilityTimer = null;
+        let invincibilityTimeLeft = 0;
+        let revealedBombs = new Set(); // Bombs revealed by Sage flowers
 
         // Bomb and flower field generation logic
         function createBombField(size, numBombs, numFlowers) {
-            const totalItems = numBombs + numFlowers;
+            // Calculate rewind power-ups (1-2 per game)
+            const numRewinds = Math.floor(Math.random() * 2) + 1;
+            const totalItems = numBombs + numFlowers + numRewinds;
             if (totalItems > size * size) {
                 throw new Error(`Total items (${totalItems}) cannot exceed field size (${size * size})`);
             }
@@ -414,6 +517,16 @@
                 field[row][col] = 2; // 2 = flower
             });
 
+            // Place rewind power-ups
+            for (let i = 0; i < numRewinds; i++) {
+                const randomIndex = Math.floor(Math.random() * positions.length);
+                const [row, col] = positions.splice(randomIndex, 1)[0];
+                field[row][col] = 3; // 3 = rewind power-up
+            }
+
+            // Feature 3: Mutate flowers based on bomb proximity
+            mutateFlowers(field, size);
+
             // Place gnome at random position
             gnomePosition = {
                 row: Math.floor(Math.random() * size),
@@ -423,8 +536,55 @@
             return field;
         }
 
+        // Count adjacent bombs for a cell
+        function countAdjacentBombs(field, row, col, size) {
+            let count = 0;
+            const neighbors = [
+                [-1, -1], [-1, 0], [-1, 1],
+                [0, -1],           [0, 1],
+                [1, -1],  [1, 0],  [1, 1]
+            ];
+
+            for (const [dr, dc] of neighbors) {
+                const newRow = row + dr;
+                const newCol = col + dc;
+                if (newRow >= 0 && newRow < size && newCol >= 0 && newCol < size) {
+                    if (field[newRow][newCol] === 1) {
+                        count++;
+                    }
+                }
+            }
+            return count;
+        }
+
+        // Mutate flowers based on bomb proximity
+        function mutateFlowers(field, size) {
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    if (field[i][j] === 2) { // Regular flower
+                        const adjacentBombs = countAdjacentBombs(field, i, j, size);
+
+                        if (adjacentBombs >= 2) {
+                            // Phoenix Flower - dangerous location grants invincibility
+                            field[i][j] = 4;
+                        } else if (adjacentBombs === 0) {
+                            // Sage Flower - safe location grants vision
+                            field[i][j] = 5;
+                        }
+                        // adjacentBombs === 1 stays as regular flower (2)
+                    }
+                }
+            }
+        }
+
         function moveGnome() {
             if (!currentField || currentFieldSize === 0 || gnomeStatus === 'dead') return;
+
+            // Feature 1: Track position history
+            positionHistory.push({ row: gnomePosition.row, col: gnomePosition.col });
+            if (positionHistory.length > MAX_HISTORY) {
+                positionHistory.shift(); // Keep only last 10 positions
+            }
 
             // Get possible moves (adjacent cells)
             const moves = [
@@ -442,7 +602,7 @@
             const validMoves = moves.filter(move => {
                 const newRow = gnomePosition.row + move.row;
                 const newCol = gnomePosition.col + move.col;
-                return newRow >= 0 && newRow < currentFieldSize && 
+                return newRow >= 0 && newRow < currentFieldSize &&
                        newCol >= 0 && newCol < currentFieldSize;
             });
 
@@ -463,54 +623,209 @@
 
         function handleGnomeInteraction() {
             const cellContent = currentField[gnomePosition.row][gnomePosition.col];
-            
-            if (cellContent === 2) { // Flower
+
+            if (cellContent === 2 || cellContent === 4 || cellContent === 5) { // Any type of flower
                 gnomeStatus = 'collecting';
                 flowersCollected++;
-                // Remove the flower from the field
-                currentField[gnomePosition.row][gnomePosition.col] = 0;
-                
+
                 // Heal the gnome (up to maximum of 3 health)
                 if (gnomeHealth < 3) {
                     gnomeHealth++;
                 }
-                
+
+                // Feature 3: Handle special flower types
+                if (cellContent === 4) { // Phoenix Flower
+                    activateInvincibility();
+                } else if (cellContent === 5) { // Sage Flower
+                    revealNearbyBombs();
+                }
+
+                // Remove the flower from the field
+                currentField[gnomePosition.row][gnomePosition.col] = 0;
+
                 // Reset status after animation
                 setTimeout(() => {
-                    gnomeStatus = 'happy';
+                    gnomeStatus = gnomeStatus === 'invincible' ? 'invincible' : 'happy';
                     updateFieldDisplay();
-                    
+
                     // Check if all flowers collected
-                    const remainingFlowers = currentField.flat().filter(cell => cell === 2).length;
+                    const remainingFlowers = currentField.flat().filter(cell => cell === 2 || cell === 4 || cell === 5).length;
                     if (remainingFlowers === 0) {
-                        showGameMessage('🌸 All flowers collected! The gnome is fully healed and victorious!', 'win');
+                        showGameMessage('🌸 All flowers collected! The gnome is victorious!', 'win');
                         stopGnomeMovement();
                     }
                 }, 300);
-                
+
+            } else if (cellContent === 3) { // Rewind power-up
+                gnomeStatus = 'rewinding';
+                rewindCharges++;
+                currentField[gnomePosition.row][gnomePosition.col] = 0;
+
+                setTimeout(() => {
+                    gnomeStatus = gnomeStatus === 'invincible' ? 'invincible' : 'happy';
+                    updateFieldDisplay();
+                    showGameMessage(`⏪ Rewind power-up collected! Charges: ${rewindCharges}`, 'win');
+                    setTimeout(() => {
+                        const msg = document.getElementById('gameMessage');
+                        if (msg) msg.style.display = 'none';
+                    }, 2000);
+                }, 500);
+
             } else if (cellContent === 1) { // Bomb
+                // Feature 3: Check invincibility
+                if (gnomeStatus === 'invincible') {
+                    // Invincible gnomes are protected!
+                    return;
+                }
+
+                // Feature 1: Auto-use rewind if about to die
+                if (gnomeHealth - 1 <= 0 && rewindCharges > 0) {
+                    activateRewind();
+                    return;
+                }
+
                 gnomeStatus = 'exploding';
                 gnomeHealth--;
-                
+
+                // Feature 2: Trigger chain reaction
+                const bombKey = `${gnomePosition.row},${gnomePosition.col}`;
+                if (!explodedBombs.has(bombKey)) {
+                    explodedBombs.add(bombKey);
+                    triggerChainReaction(gnomePosition.row, gnomePosition.col);
+                }
+
                 if (gnomeHealth <= 0) {
                     // Gnome dies
                     setTimeout(() => {
                         gnomeStatus = 'dead';
                         updateFieldDisplay();
                         stopGnomeMovement();
-                        showGameMessage('💀 Game Over! The gnome died from too many explosions!', 'lose');
+                        showGameMessage('💀 Game Over! The gnome died from explosions!', 'lose');
                     }, 600);
                 } else {
                     // Gnome survives but is hurt, respawn elsewhere
                     setTimeout(() => {
                         respawnGnome();
-                        gnomeStatus = 'happy';
+                        gnomeStatus = gnomeStatus === 'invincible' ? 'invincible' : 'happy';
                         updateFieldDisplay();
                     }, 600);
                 }
             } else {
-                gnomeStatus = 'happy';
+                gnomeStatus = gnomeStatus === 'invincible' ? 'invincible' : 'happy';
             }
+        }
+
+        // Feature 1: Activate rewind
+        function activateRewind() {
+            if (rewindCharges <= 0 || positionHistory.length < REWIND_STEPS) return;
+
+            rewindCharges--;
+            gnomeStatus = 'rewinding';
+
+            // Go back 5 steps (or less if history is shorter)
+            const stepsBack = Math.min(REWIND_STEPS, positionHistory.length);
+            const targetPosition = positionHistory[positionHistory.length - stepsBack];
+
+            // Remove the rewound positions from history
+            positionHistory.splice(positionHistory.length - stepsBack);
+
+            // Move gnome to previous position
+            gnomePosition = { ...targetPosition };
+
+            updateFieldDisplay();
+
+            setTimeout(() => {
+                gnomeStatus = gnomeStatus === 'invincible' ? 'invincible' : 'happy';
+                updateFieldDisplay();
+                showGameMessage(`⏪ Rewind activated! Went back ${stepsBack} steps. Charges left: ${rewindCharges}`, 'win');
+                setTimeout(() => {
+                    const msg = document.getElementById('gameMessage');
+                    if (msg) msg.style.display = 'none';
+                }, 2000);
+            }, 500);
+        }
+
+        // Feature 3: Activate invincibility from Phoenix Flower
+        function activateInvincibility() {
+            clearInterval(invincibilityTimer);
+            invincibilityTimeLeft = 10; // 10 seconds of invincibility
+            gnomeStatus = 'invincible';
+
+            invincibilityTimer = setInterval(() => {
+                invincibilityTimeLeft--;
+                updateFieldDisplay();
+
+                if (invincibilityTimeLeft <= 0) {
+                    clearInterval(invincibilityTimer);
+                    gnomeStatus = 'happy';
+                    updateFieldDisplay();
+                }
+            }, 1000);
+        }
+
+        // Feature 3: Reveal nearby bombs from Sage Flower
+        function revealNearbyBombs() {
+            const revealRadius = 3;
+
+            for (let i = 0; i < currentFieldSize; i++) {
+                for (let j = 0; j < currentFieldSize; j++) {
+                    if (currentField[i][j] === 1) { // Is a bomb
+                        const distance = Math.abs(i - gnomePosition.row) + Math.abs(j - gnomePosition.col);
+                        if (distance <= revealRadius) {
+                            revealedBombs.add(`${i},${j}`);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Feature 2: Trigger chain reaction from bomb explosion
+        function triggerChainReaction(row, col) {
+            const neighbors = [
+                [-1, -1], [-1, 0], [-1, 1],
+                [0, -1],           [0, 1],
+                [1, -1],  [1, 0],  [1, 1]
+            ];
+
+            setTimeout(() => {
+                for (const [dr, dc] of neighbors) {
+                    const newRow = row + dr;
+                    const newCol = col + dc;
+
+                    if (newRow >= 0 && newRow < currentFieldSize &&
+                        newCol >= 0 && newCol < currentFieldSize) {
+
+                        const bombKey = `${newRow},${newCol}`;
+
+                        if (currentField[newRow][newCol] === 1 && !explodedBombs.has(bombKey)) {
+                            // Found an adjacent bomb - explode it!
+                            explodedBombs.add(bombKey);
+
+                            // Visual explosion effect
+                            updateFieldDisplay();
+
+                            // Damage gnome if they're at this position
+                            if (gnomePosition.row === newRow && gnomePosition.col === newCol) {
+                                if (gnomeStatus !== 'invincible') {
+                                    gnomeHealth--;
+                                    gnomeStatus = 'exploding';
+                                    if (gnomeHealth <= 0) {
+                                        setTimeout(() => {
+                                            gnomeStatus = 'dead';
+                                            updateFieldDisplay();
+                                            stopGnomeMovement();
+                                            showGameMessage('💀 Game Over! Chain reaction!', 'lose');
+                                        }, 400);
+                                    }
+                                }
+                            }
+
+                            // Continue chain reaction
+                            triggerChainReaction(newRow, newCol);
+                        }
+                    }
+                }
+            }, 200); // Delay for cascading effect
         }
 
         function showGameMessage(message, type) {
@@ -547,10 +862,11 @@
             fieldContainer.innerHTML = '';
             const fieldDisplay = renderField(currentField, 'Bomb & Flower Field');
             fieldContainer.appendChild(fieldDisplay);
-            
+
             // Update stats to show current gnome status
             const bombCount = currentField.flat().filter(cell => cell === 1).length;
-            const flowerCount = currentField.flat().filter(cell => cell === 2).length;
+            // Count all flower types: regular (2), phoenix (4), sage (5)
+            const flowerCount = currentField.flat().filter(cell => cell === 2 || cell === 4 || cell === 5).length;
             showStats(currentFieldSize, bombCount, flowerCount);
         }
 
@@ -585,6 +901,9 @@
                     const cell = document.createElement('div');
                     cell.className = 'field-cell';
 
+                    // Feature 1: Check if this is part of ghost trail
+                    const isGhostTrail = positionHistory.some(pos => pos.row === i && pos.col === j);
+
                     // Check if gnome is at this position
                     if (gnomePosition.row === i && gnomePosition.col === j) {
                         cell.className += ` cell-gnome ${gnomeStatus}`;
@@ -594,15 +913,40 @@
                             cell.textContent = '💥';
                         } else if (gnomeStatus === 'collecting') {
                             cell.textContent = '🌟';
+                        } else if (gnomeStatus === 'invincible') {
+                            cell.textContent = '✨🧙‍♂️✨';
+                        } else if (gnomeStatus === 'rewinding') {
+                            cell.textContent = '⏪';
                         } else {
                             cell.textContent = '🧙‍♂️';
                         }
+                    } else if (isGhostTrail && gnomeStatus !== 'dead') {
+                        // Feature 1: Show ghost trail
+                        cell.className += ' cell-ghost-trail';
                     } else if (field[i][j] === 1) {
-                        cell.className += ' cell-bomb';
+                        // Feature 3: Check if bomb is revealed
+                        const bombKey = `${i},${j}`;
+                        if (revealedBombs.has(bombKey)) {
+                            cell.className += ' cell-bomb-revealed';
+                        } else {
+                            cell.className += ' cell-bomb';
+                        }
                         cell.textContent = '💣';
                     } else if (field[i][j] === 2) {
                         cell.className += ' cell-flower';
                         cell.textContent = '🌸';
+                    } else if (field[i][j] === 3) {
+                        // Feature 1: Rewind power-up
+                        cell.className += ' cell-rewind-powerup';
+                        cell.textContent = '⏪';
+                    } else if (field[i][j] === 4) {
+                        // Feature 3: Phoenix Flower
+                        cell.className += ' cell-phoenix-flower';
+                        cell.textContent = '🔥';
+                    } else if (field[i][j] === 5) {
+                        // Feature 3: Sage Flower
+                        cell.className += ' cell-sage-flower';
+                        cell.textContent = '🔮';
                     } else {
                         cell.className += ' cell-empty';
                         cell.textContent = '';
@@ -620,6 +964,10 @@
             const totalCells = size * size;
             const totalItems = numBombs + numFlowers;
             const density = ((totalItems / totalCells) * 100).toFixed(1);
+
+            const invincibilityDisplay = invincibilityTimeLeft > 0 ?
+                `<span style="color: #FFD700;">✨ ${invincibilityTimeLeft}s</span>` :
+                '<span style="color: #999;">-</span>';
 
             const statsHTML = `
                 <div class="stat-item">
@@ -641,6 +989,14 @@
                 <div class="stat-item">
                     <div class="stat-value">🏆 ${flowersCollected}</div>
                     <div class="stat-label">Flowers Used</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">⏪ ${rewindCharges}</div>
+                    <div class="stat-label">Rewind Charges</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${invincibilityDisplay}</div>
+                    <div class="stat-label">Invincibility</div>
                 </div>
             `;
 
@@ -681,12 +1037,22 @@
 
             try {
                 const bombField = createBombField(size, numBombs, numFlowers);
-                
+
                 // Reset gnome stats for new game
                 gnomeHealth = 3;
                 flowersCollected = 0;
                 gnomeStatus = 'happy';
-                
+
+                // Reset new feature states
+                positionHistory = [];
+                rewindCharges = 0;
+                chainReactionInProgress = false;
+                explodedBombs = new Set();
+                revealedBombs = new Set();
+                invincibilityTimeLeft = 0;
+                clearInterval(invincibilityTimer);
+                invincibilityTimer = null;
+
                 // Store current field for gnome movement
                 currentField = bombField;
                 currentFieldSize = size;

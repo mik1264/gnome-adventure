@@ -335,19 +335,6 @@
             box-shadow: 0 0 10px rgba(255, 107, 0, 0.6);
         }
 
-        .cell-sage-flower {
-            background: linear-gradient(135deg, #6b5b95 0%, #4a148c 100%);
-            color: white;
-            animation: sageGlow 1s ease-in-out infinite alternate;
-            box-shadow: 0 0 10px rgba(107, 91, 149, 0.6);
-        }
-
-        .cell-rewind-powerup {
-            background: linear-gradient(135deg, #00d4ff 0%, #0066ff 100%);
-            color: white;
-            animation: rewindPulse 1s ease-in-out infinite;
-        }
-
         .cell-ghost-trail {
             background: rgba(144, 238, 144, 0.6);
             position: relative;
@@ -356,12 +343,6 @@
         .cell-ghost-trail::after {
             content: '👻';
             font-size: 0.7em;
-        }
-
-        .cell-bomb-revealed {
-            background: #ffcccc;
-            color: #cc0000;
-            border: 2px dashed #ff0000;
         }
 
         .cell-bomb-exploding {
@@ -425,17 +406,6 @@
         @keyframes phoenixGlow {
             0% { box-shadow: 0 0 10px rgba(255, 107, 0, 0.6); }
             100% { box-shadow: 0 0 20px rgba(255, 0, 0, 0.9); }
-        }
-
-        @keyframes sageGlow {
-            0% { box-shadow: 0 0 10px rgba(107, 91, 149, 0.6); }
-            100% { box-shadow: 0 0 20px rgba(74, 20, 140, 0.9); }
-        }
-
-        @keyframes rewindPulse {
-            0% { transform: scale(1); box-shadow: 0 0 5px rgba(0, 212, 255, 0.6); }
-            50% { transform: scale(1.1); box-shadow: 0 0 15px rgba(0, 102, 255, 0.9); }
-            100% { transform: scale(1); box-shadow: 0 0 5px rgba(0, 212, 255, 0.6); }
         }
 
         @keyframes invincibleShield {
@@ -564,20 +534,12 @@
                             <span class="help-text"><strong>Bomb</strong> - Damages gnome (-1 HP), triggers chain reactions</span>
                         </div>
                         <div class="help-item">
-                            <span class="help-icon" style="border: 2px dashed #ff0000; padding: 2px; border-radius: 4px;">💣</span>
-                            <span class="help-text"><strong>Revealed Bomb</strong> - Bomb shown by Sage Flower (dashed border, lighter background)</span>
-                        </div>
-                        <div class="help-item">
                             <span class="help-icon">🌸</span>
                             <span class="help-text"><strong>Regular Flower</strong> - Heals +1 HP (max 3)</span>
                         </div>
                         <div class="help-item">
                             <span class="help-icon">🔥</span>
                             <span class="help-text"><strong>Phoenix Flower</strong> - Heals +1 HP + 10s invincibility! (near 2+ bombs)</span>
-                        </div>
-                        <div class="help-item">
-                            <span class="help-icon">🔮</span>
-                            <span class="help-text"><strong>Sage Flower</strong> - Heals +1 HP + reveals nearby bombs with dashed borders (0 adjacent bombs)</span>
                         </div>
                         <div class="help-item">
                             <span class="help-icon">👻</span>
@@ -637,7 +599,6 @@
         // Feature 3: Flower Mutations
         let invincibilityTimer = null;
         let invincibilityTimeLeft = 0;
-        let revealedBombs = new Set(); // Bombs revealed by Sage flowers
 
         // Bomb and flower field generation logic
         function createBombField(size, numBombs, numFlowers) {
@@ -724,11 +685,8 @@
                         if (adjacentBombs >= 2) {
                             // Phoenix Flower - dangerous location grants invincibility
                             field[i][j] = 4;
-                        } else if (adjacentBombs === 0) {
-                            // Sage Flower - safe location grants vision
-                            field[i][j] = 5;
                         }
-                        // adjacentBombs === 1 stays as regular flower (2)
+                        // All other flowers stay as regular flowers (2)
                     }
                 }
             }
@@ -781,7 +739,7 @@
         function handleGnomeInteraction() {
             const cellContent = currentField[gnomePosition.row][gnomePosition.col];
 
-            if (cellContent === 2 || cellContent === 4 || cellContent === 5) { // Any type of flower
+            if (cellContent === 2 || cellContent === 4) { // Any type of flower
                 gnomeStatus = 'collecting';
                 flowersCollected++;
 
@@ -793,8 +751,6 @@
                 // Feature 3: Handle special flower types
                 if (cellContent === 4) { // Phoenix Flower
                     activateInvincibility();
-                } else if (cellContent === 5) { // Sage Flower
-                    revealNearbyBombs();
                 }
 
                 // Remove the flower from the field
@@ -806,7 +762,7 @@
                     updateFieldDisplay();
 
                     // Check if all flowers collected
-                    const remainingFlowers = currentField.flat().filter(cell => cell === 2 || cell === 4 || cell === 5).length;
+                    const remainingFlowers = currentField.flat().filter(cell => cell === 2 || cell === 4).length;
                     if (remainingFlowers === 0) {
                         showGameMessage('🌸 All flowers collected! The gnome is victorious!', 'win');
                         stopGnomeMovement();
@@ -869,22 +825,6 @@
                     updateFieldDisplay();
                 }
             }, 1000);
-        }
-
-        // Feature 3: Reveal nearby bombs from Sage Flower
-        function revealNearbyBombs() {
-            const revealRadius = 3;
-
-            for (let i = 0; i < currentFieldSize; i++) {
-                for (let j = 0; j < currentFieldSize; j++) {
-                    if (currentField[i][j] === 1) { // Is a bomb
-                        const distance = Math.abs(i - gnomePosition.row) + Math.abs(j - gnomePosition.col);
-                        if (distance <= revealRadius) {
-                            revealedBombs.add(`${i},${j}`);
-                        }
-                    }
-                }
-            }
         }
 
         // Feature 2: Trigger chain reaction from bomb explosion
@@ -974,8 +914,8 @@
 
             // Update stats to show current gnome status
             const bombCount = currentField.flat().filter(cell => cell === 1).length;
-            // Count all flower types: regular (2), phoenix (4), sage (5)
-            const flowerCount = currentField.flat().filter(cell => cell === 2 || cell === 4 || cell === 5).length;
+            // Count all flower types: regular (2), phoenix (4)
+            const flowerCount = currentField.flat().filter(cell => cell === 2 || cell === 4).length;
             showStats(currentFieldSize, bombCount, flowerCount);
         }
 
@@ -1084,13 +1024,7 @@
                         cell.className += ' cell-ghost-trail';
                         cell.style.opacity = opacity * 0.5; // Max 0.5 opacity for newest trail
                     } else if (field[i][j] === 1) {
-                        // Feature 3: Check if bomb is revealed
-                        const bombKey = `${i},${j}`;
-                        if (revealedBombs.has(bombKey)) {
-                            cell.className += ' cell-bomb-revealed';
-                        } else {
-                            cell.className += ' cell-bomb';
-                        }
+                        cell.className += ' cell-bomb';
                         cell.textContent = '💣';
                     } else if (field[i][j] === 2) {
                         cell.className += ' cell-flower';
@@ -1099,10 +1033,6 @@
                         // Feature 3: Phoenix Flower
                         cell.className += ' cell-phoenix-flower';
                         cell.textContent = '🔥';
-                    } else if (field[i][j] === 5) {
-                        // Feature 3: Sage Flower
-                        cell.className += ' cell-sage-flower';
-                        cell.textContent = '🔮';
                     } else {
                         cell.className += ' cell-empty';
                         cell.textContent = '';
@@ -1199,7 +1129,6 @@
                 positionHistory = [];
                 chainReactionInProgress = false;
                 explodedBombs = new Set();
-                revealedBombs = new Set();
                 invincibilityTimeLeft = 0;
                 clearInterval(invincibilityTimer);
                 invincibilityTimer = null;

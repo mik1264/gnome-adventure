@@ -75,10 +75,10 @@
         @media (max-width: 1024px) {
             .controls {
                 padding: 6px 8px;
-                display: grid;
-                grid-template-columns: 1fr auto;
+                display: flex;
                 gap: 4px;
                 align-items: center;
+                flex-wrap: nowrap;
             }
         }
 
@@ -93,11 +93,12 @@
 
         @media (max-width: 1024px) {
             .control-group {
-                gap: 4px;
+                gap: 3px;
                 margin-bottom: 0;
-                flex-wrap: wrap;
-                align-items: flex-end;
+                flex-wrap: nowrap;
+                align-items: center;
                 justify-content: flex-start;
+                flex: 1;
             }
         }
 
@@ -110,7 +111,8 @@
 
         @media (max-width: 1024px) {
             .control-item {
-                gap: 2px;
+                gap: 1px;
+                flex-shrink: 0;
             }
         }
 
@@ -176,9 +178,9 @@
         @media (max-width: 1024px) {
             .help-section {
                 margin-top: 0;
-                padding-top: 4px;
-                grid-column: 1 / -1;
-                border-top: 1px solid #e9ecef;
+                padding-top: 0;
+                border-top: none;
+                flex-shrink: 0;
             }
         }
 
@@ -196,8 +198,12 @@
 
         @media (max-width: 1024px) {
             .help-header {
-                font-size: 0.8em;
-                padding: 6px;
+                font-size: 0.65em;
+                padding: 4px 6px;
+                background: transparent;
+                color: #007bff;
+                cursor: pointer;
+                text-decoration: underline;
             }
         }
 
@@ -213,6 +219,12 @@
 
         #help-toggle.collapsed {
             transform: rotate(-90deg);
+        }
+
+        @media (max-width: 1024px) {
+            #help-toggle {
+                display: none;
+            }
         }
 
         .help-content {
@@ -232,6 +244,62 @@
 
         .help-content.collapsed {
             max-height: 0;
+        }
+
+        .help-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .help-modal.active {
+            display: flex;
+        }
+
+        .help-modal-content {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            position: relative;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .help-modal-close {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            font-size: 1.5em;
+            cursor: pointer;
+            background: none;
+            border: none;
+            color: #6c757d;
+            padding: 0;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .help-modal-close:hover {
+            color: #000;
+        }
+
+        @media (max-width: 1024px) {
+            .help-content {
+                display: none;
+            }
         }
 
         .help-grid {
@@ -350,8 +418,9 @@
 
         @media (max-width: 1024px) {
             .button-group {
-                gap: 4px;
-                flex-direction: column;
+                gap: 3px;
+                flex-direction: row;
+                flex-shrink: 0;
             }
         }
 
@@ -742,13 +811,13 @@
                 </div>
             </div>
             <div class="button-group">
-                <button class="btn btn-primary" onclick="generateField()">Generate</button>
-                <button class="btn btn-secondary" onclick="startGame()" id="startButton">Start</button>
+                <button class="btn btn-secondary" onclick="generateField()">Generate</button>
+                <button class="btn btn-primary" onclick="startGame()" id="startButton">Start</button>
             </div>
 
             <div class="help-section">
                 <div class="help-header" onclick="toggleHelp()">
-                    <span id="help-toggle" class="collapsed">▼</span> Game Guide
+                    <span id="help-toggle" class="collapsed">▼</span> Guide
                 </div>
                 <div class="help-content collapsed" id="helpContent">
                     <div class="help-grid">
@@ -797,6 +866,52 @@
             <div class="stats" id="stats"></div>
             <div class="field-container" id="fieldContainer"></div>
             <div class="game-message" id="gameMessage" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Help Modal -->
+    <div class="help-modal" id="helpModal">
+        <div class="help-modal-content">
+            <button class="help-modal-close" onclick="closeHelpModal()">×</button>
+            <h2 style="margin-top: 0; margin-bottom: 20px; color: #495057;">🎮 Game Guide</h2>
+            <div class="help-grid">
+                <div class="help-item">
+                    <span class="help-icon">🧙‍♂️</span>
+                    <span class="help-text"><strong>Gnome</strong> - Your hero! Walks automatically</span>
+                </div>
+                <div class="help-item">
+                    <span class="help-icon">💣</span>
+                    <span class="help-text"><strong>Bomb</strong> - Damages gnome (-1 HP), triggers chain reactions</span>
+                </div>
+                <div class="help-item">
+                    <span class="help-icon">🌸</span>
+                    <span class="help-text"><strong>Regular Flower</strong> - Heals +1 HP (max 3)</span>
+                </div>
+                <div class="help-item">
+                    <span class="help-icon">🌺</span>
+                    <span class="help-text"><strong>Phoenix Flower</strong> - Heals +1 HP + 10s invincibility! (near 2+ bombs)</span>
+                </div>
+                <div class="help-item">
+                    <span class="help-icon">👻</span>
+                    <span class="help-text"><strong>Ghost Trail</strong> - Shows gnome's last 10 positions (fades with age)</span>
+                </div>
+                <div class="help-item">
+                    <span class="help-icon">✨</span>
+                    <span class="help-text"><strong>Invincible Gnome</strong> - Immune to bombs! From Phoenix Flower</span>
+                </div>
+                <div class="help-item">
+                    <span class="help-icon">💀</span>
+                    <span class="help-text"><strong>Dead</strong> - Game Over (0 HP)</span>
+                </div>
+            </div>
+            <div class="help-tips">
+                <strong>💡 Tips:</strong>
+                <ul>
+                    <li>Chain reactions can trigger multiple bombs!</li>
+                    <li>Collect all flowers to win</li>
+                    <li>Adjust speed anytime during gameplay</li>
+                </ul>
+            </div>
         </div>
     </div>
 
@@ -1176,17 +1291,24 @@
         }
 
         function toggleHelp() {
-            const content = document.getElementById('helpContent');
-            const toggle = document.getElementById('help-toggle');
-
-            if (content.classList.contains('collapsed')) {
-                content.classList.remove('collapsed');
-                toggle.classList.remove('collapsed');
-            } else {
-                content.classList.add('collapsed');
-                toggle.classList.add('collapsed');
-            }
+            const modal = document.getElementById('helpModal');
+            modal.classList.add('active');
         }
+
+        function closeHelpModal() {
+            const modal = document.getElementById('helpModal');
+            modal.classList.remove('active');
+        }
+
+        // Close modal when clicking outside
+        document.addEventListener('DOMContentLoaded', function() {
+            const modal = document.getElementById('helpModal');
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    closeHelpModal();
+                }
+            });
+        });
 
         function startGnomeMovement() {
             clearInterval(gnomeTimer);

@@ -169,6 +169,30 @@
             }
         }
 
+        .control-item select {
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 1em;
+            width: 150px;
+            cursor: pointer;
+            transition: border-color 0.3s;
+            background: white;
+        }
+
+        @media (max-width: 1024px) {
+            .control-item select {
+                padding: 4px;
+                font-size: 0.75em;
+                width: 90px;
+            }
+        }
+
+        .control-item select:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
         #speedValue {
             font-weight: bold;
             color: #007bff;
@@ -786,6 +810,17 @@
                     <label for="gameSpeed">Speed: <span id="speedValue">3x</span></label>
                     <input type="range" id="gameSpeed" min="1" max="5" value="3" oninput="updateSpeedLabel()">
                 </div>
+                <div class="control-item">
+                    <label for="explorationAlgo">AI Style</label>
+                    <select id="explorationAlgo" onchange="updateAlgorithm()">
+                        <option value="wanderer" selected>Wanderer</option>
+                        <option value="brave">Brave Explorer</option>
+                        <option value="treasure-hunter">Treasure Hunter</option>
+                        <option value="scaredy-cat">Scaredy Cat</option>
+                        <option value="scout">Scout</option>
+                        <option value="drifter">Drifter</option>
+                    </select>
+                </div>
             </div>
             <div class="button-group">
                 <button class="btn btn-secondary" onclick="generateField()">Generate</button>
@@ -915,6 +950,13 @@
         let invincibilityTimer = null;
         let invincibilityTimeLeft = 0;
 
+        // Exploration Algorithm Feature
+        let explorationAlgorithm = 'wanderer'; // Current selected algorithm
+        let visitedCells = new Set(); // Track "row,col" strings
+        let knownBombs = new Set(); // Remember bomb locations as "row,col" strings
+        let knownFlowers = new Set(); // Remember flower locations as "row,col" strings
+        let lastMoveDirection = null; // For Drifter algorithm {row, col}
+
         // Bomb and flower field generation logic
         function createBombField(size, numBombs, numFlowers) {
             const totalItems = numBombs + numFlowers;
@@ -1007,6 +1049,331 @@
             }
         }
 
+        // Helper Functions for Exploration Algorithms
+
+        // Get what gnome can see in adjacent cells
+        function getCellsInVision() {
+            const neighbors = [
+                [-1, -1], [-1, 0], [-1, 1],
+                [0, -1],           [0, 1],
+                [1, -1],  [1, 0],  [1, 1]
+            ];
+
+            return neighbors
+                .map(([dr, dc]) => ({
+                    row: gnomePosition.row + dr,
+                    col: gnomePosition.col + dc
+                }))
+                .filter(({row, col}) =>
+                    row >= 0 && row < currentFieldSize &&
+                    col >= 0 && col < currentFieldSize
+                )
+                .map(({row, col}) => ({
+                    row,
+                    col,
+                    content: currentField[row][col]
+                }));
+        }
+
+        // Check if a position is adjacent to bombs (using vision + memory)
+        function isAdjacentToBomb(row, col) {
+            const neighbors = [
+                [-1, -1], [-1, 0], [-1, 1],
+                [0, -1],           [0, 1],
+                [1, -1],  [1, 0],  [1, 1]
+            ];
+
+            for (const [dr, dc] of neighbors) {
+                const newRow = row + dr;
+                const newCol = col + dc;
+
+                // Check if in bounds
+                if (newRow >= 0 && newRow < currentFieldSize &&
+                    newCol >= 0 && newCol < currentFieldSize) {
+
+                    // Check visible bombs
+                    if (currentField[newRow][newCol] === 1) {
+                        return true;
+                    }
+
+                    // Check remembered bombs
+                    if (knownBombs.has(`${newRow},${newCol}`)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Count bombs adjacent to a position (for danger scoring)
+        function countAdjacentBombsAt(row, col) {
+            const neighbors = [
+                [-1, -1], [-1, 0], [-1, 1],
+                [0, -1],           [0, 1],
+                [1, -1],  [1, 0],  [1, 1]
+            ];
+
+            let count = 0;
+            for (const [dr, dc] of neighbors) {
+                const newRow = row + dr;
+                const newCol = col + dc;
+
+                if (newRow >= 0 && newRow < currentFieldSize &&
+                    newCol >= 0 && newCol < currentFieldSize) {
+
+                    // Check visible bombs
+                    if (currentField[newRow][newCol] === 1) {
+                        count++;
+                    }
+                    // Also check remembered bombs
+                    else if (knownBombs.has(`${newRow},${newCol}`)) {
+                        count++;
+                    }
+                }
+            }
+            return count;
+        }
+
+        // Update memory after each move
+        function updateGnomeMemory() {
+            // Mark current cell as visited
+            visitedCells.add(`${gnomePosition.row},${gnomePosition.col}`);
+
+            // Scan vision and update known bombs/flowers
+            const visibleCells = getCellsInVision();
+            for (const cell of visibleCells) {
+                const key = `${cell.row},${cell.col}`;
+                if (cell.content === 1) { // Bomb
+                    knownBombs.add(key);
+                } else if (cell.content === 2 || cell.content === 4) { // Flower (regular or phoenix)
+                    knownFlowers.add(key);
+                }
+            }
+        }
+
+        // Find closest known flower using Manhattan distance
+        function findClosestKnownFlower() {
+            if (knownFlowers.size === 0) return null;
+
+            let closest = null;
+            let minDistance = Infinity;
+
+            for (const flowerKey of knownFlowers) {
+                const [row, col] = flowerKey.split(',').map(Number);
+                const distance = Math.abs(gnomePosition.row - row) + Math.abs(gnomePosition.col - col);
+
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closest = { row, col };
+                }
+            }
+
+            return closest;
+        }
+
+        // Calculate Manhattan distance between two points
+        function manhattanDistance(row1, col1, row2, col2) {
+            return Math.abs(row1 - row2) + Math.abs(col1 - col2);
+        }
+
+        // Exploration Algorithm Functions
+
+        // Wanderer: Pure random walk
+        function algorithmWanderer(validMoves) {
+            return validMoves[Math.floor(Math.random() * validMoves.length)];
+        }
+
+        // Brave Explorer: Prioritizes unexplored territory
+        function algorithmBrave(validMoves) {
+            // Filter for unexplored cells
+            const unexploredMoves = validMoves.filter(move => {
+                const destRow = gnomePosition.row + move.row;
+                const destCol = gnomePosition.col + move.col;
+                return !visitedCells.has(`${destRow},${destCol}`);
+            });
+
+            // If unexplored cells exist, pick random from them
+            if (unexploredMoves.length > 0) {
+                return unexploredMoves[Math.floor(Math.random() * unexploredMoves.length)];
+            }
+
+            // Otherwise, pick random from all valid moves
+            return validMoves[Math.floor(Math.random() * validMoves.length)];
+        }
+
+        // Treasure Hunter: Greedy flower collection
+        function algorithmTreasureHunter(validMoves) {
+            // 1. Check adjacent cells for flowers (immediate grab)
+            for (const move of validMoves) {
+                const destRow = gnomePosition.row + move.row;
+                const destCol = gnomePosition.col + move.col;
+                const content = currentField[destRow][destCol];
+                if (content === 2 || content === 4) { // Any flower
+                    return move;
+                }
+            }
+
+            // 2. If known flowers exist, move toward nearest
+            const closestFlower = findClosestKnownFlower();
+            if (closestFlower) {
+                // Pick move that minimizes distance to closest flower
+                let bestMove = validMoves[0];
+                let bestDistance = Infinity;
+
+                for (const move of validMoves) {
+                    const destRow = gnomePosition.row + move.row;
+                    const destCol = gnomePosition.col + move.col;
+                    const distance = manhattanDistance(destRow, destCol, closestFlower.row, closestFlower.col);
+
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        bestMove = move;
+                    }
+                }
+
+                return bestMove;
+            }
+
+            // 3. Otherwise, prefer unexplored cells
+            const unexploredMoves = validMoves.filter(move => {
+                const destRow = gnomePosition.row + move.row;
+                const destCol = gnomePosition.col + move.col;
+                return !visitedCells.has(`${destRow},${destCol}`);
+            });
+
+            if (unexploredMoves.length > 0) {
+                return unexploredMoves[Math.floor(Math.random() * unexploredMoves.length)];
+            }
+
+            // 4. Fallback: random valid move
+            return validMoves[Math.floor(Math.random() * validMoves.length)];
+        }
+
+        // Scaredy Cat: Risk-avoidant, survival-focused
+        function algorithmScaredyCat(validMoves) {
+            // If invincible, act brave
+            if (gnomeStatus === 'invincible') {
+                return algorithmBrave(validMoves);
+            }
+
+            // Calculate danger score for each move
+            const scoredMoves = validMoves.map(move => {
+                const destRow = gnomePosition.row + move.row;
+                const destCol = gnomePosition.col + move.col;
+
+                let danger = 0;
+
+                // Check destination content
+                if (currentField[destRow][destCol] === 1) {
+                    danger += 100; // Bomb = instant death
+                }
+
+                // Count adjacent bombs at destination
+                const adjacentBombs = countAdjacentBombsAt(destRow, destCol);
+                danger += adjacentBombs * 10;
+
+                // Unexplored cells have unknown risk
+                if (!visitedCells.has(`${destRow},${destCol}`)) {
+                    danger += 2;
+                }
+
+                return { move, danger };
+            });
+
+            // Find minimum danger score
+            const minDanger = Math.min(...scoredMoves.map(s => s.danger));
+
+            // Get all moves with minimum danger
+            const safestMoves = scoredMoves.filter(s => s.danger === minDanger);
+
+            // Among safest, prefer explored cells
+            const exploredSafe = safestMoves.filter(s => {
+                const destRow = gnomePosition.row + s.move.row;
+                const destCol = gnomePosition.col + s.move.col;
+                return visitedCells.has(`${destRow},${destCol}`);
+            });
+
+            if (exploredSafe.length > 0) {
+                return exploredSafe[Math.floor(Math.random() * exploredSafe.length)].move;
+            }
+
+            // Otherwise pick random from safest moves
+            return safestMoves[Math.floor(Math.random() * safestMoves.length)].move;
+        }
+
+        // Scout: Balanced, intelligent decision-making
+        function algorithmScout(validMoves) {
+            const bombPenalty = (gnomeStatus === 'invincible') ? 0 : -30;
+
+            const scoredMoves = validMoves.map(move => {
+                const destRow = gnomePosition.row + move.row;
+                const destCol = gnomePosition.col + move.col;
+
+                let score = 0;
+
+                // Check destination content
+                const content = currentField[destRow][destCol];
+                if (content === 2 || content === 4) {
+                    score += 100; // Flower in destination = big win
+                }
+
+                // Move toward nearest known flower
+                const closestFlower = findClosestKnownFlower();
+                if (closestFlower) {
+                    const currentDist = manhattanDistance(gnomePosition.row, gnomePosition.col, closestFlower.row, closestFlower.col);
+                    const newDist = manhattanDistance(destRow, destCol, closestFlower.row, closestFlower.col);
+
+                    if (newDist < currentDist) {
+                        score += 20; // Moving closer to flower
+                    } else if (newDist > currentDist) {
+                        score -= 10; // Moving away from flower
+                    }
+                }
+
+                // Unexplored cells are valuable
+                if (!visitedCells.has(`${destRow},${destCol}`)) {
+                    score += 15;
+                } else {
+                    score -= 5; // Slightly discourage revisiting
+                }
+
+                // Bomb danger
+                const adjacentBombs = countAdjacentBombsAt(destRow, destCol);
+                score += adjacentBombs * bombPenalty;
+
+                // Add slight randomness for variety (±5%)
+                score *= (0.95 + Math.random() * 0.1);
+
+                return { move, score };
+            });
+
+            // Find maximum score
+            const maxScore = Math.max(...scoredMoves.map(s => s.score));
+
+            // Get all moves with maximum score
+            const bestMoves = scoredMoves.filter(s => s.score === maxScore);
+
+            // Pick random from best moves
+            return bestMoves[Math.floor(Math.random() * bestMoves.length)].move;
+        }
+
+        // Drifter: Momentum-based wandering
+        function algorithmDrifter(validMoves) {
+            // 70% chance to continue in same direction if valid
+            if (lastMoveDirection && Math.random() < 0.7) {
+                const continueMove = validMoves.find(move =>
+                    move.row === lastMoveDirection.row && move.col === lastMoveDirection.col
+                );
+
+                if (continueMove) {
+                    return continueMove;
+                }
+            }
+
+            // Otherwise pick random
+            return validMoves[Math.floor(Math.random() * validMoves.length)];
+        }
+
         function moveGnome() {
             if (!currentField || currentFieldSize === 0 || gnomeStatus === 'dead') return;
 
@@ -1039,10 +1406,40 @@
             // If no valid moves, stay in place
             if (validMoves.length === 0) return;
 
-            // Pick a random valid move
-            const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
-            gnomePosition.row += randomMove.row;
-            gnomePosition.col += randomMove.col;
+            // Select move using current algorithm
+            let selectedMove;
+            switch(explorationAlgorithm) {
+                case 'wanderer':
+                    selectedMove = algorithmWanderer(validMoves);
+                    break;
+                case 'brave':
+                    selectedMove = algorithmBrave(validMoves);
+                    break;
+                case 'treasure-hunter':
+                    selectedMove = algorithmTreasureHunter(validMoves);
+                    break;
+                case 'scaredy-cat':
+                    selectedMove = algorithmScaredyCat(validMoves);
+                    break;
+                case 'scout':
+                    selectedMove = algorithmScout(validMoves);
+                    break;
+                case 'drifter':
+                    selectedMove = algorithmDrifter(validMoves);
+                    break;
+                default:
+                    selectedMove = algorithmWanderer(validMoves);
+            }
+
+            // Apply the move
+            gnomePosition.row += selectedMove.row;
+            gnomePosition.col += selectedMove.col;
+
+            // Store direction for Drifter algorithm
+            lastMoveDirection = selectedMove;
+
+            // Update memory
+            updateGnomeMemory();
 
             // Increment step counter
             stepCounter++;
@@ -1073,6 +1470,9 @@
 
                 // Remove the flower from the field
                 currentField[gnomePosition.row][gnomePosition.col] = 0;
+
+                // Remove from memory
+                knownFlowers.delete(`${gnomePosition.row},${gnomePosition.col}`);
 
                 // Reset status after animation
                 setTimeout(() => {
@@ -1265,6 +1665,11 @@
             if (gnomeTimer) {
                 startGnomeMovement();
             }
+        }
+
+        function updateAlgorithm() {
+            explorationAlgorithm = document.getElementById('explorationAlgo').value;
+            // No need to restart - will take effect on next move
         }
 
         function toggleHelp() {
@@ -1463,9 +1868,19 @@
                 clearInterval(invincibilityTimer);
                 invincibilityTimer = null;
 
+                // Reset algorithm memory
+                visitedCells = new Set();
+                knownBombs = new Set();
+                knownFlowers = new Set();
+                lastMoveDirection = null;
+
                 // Store current field for gnome movement
                 currentField = bombField;
                 currentFieldSize = size;
+
+                // Initialize memory with starting position
+                visitedCells.add(`${gnomePosition.row},${gnomePosition.col}`);
+                updateGnomeMemory();
                 
                 const results = document.getElementById('results');
                 results.style.display = 'block';

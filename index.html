@@ -18,6 +18,12 @@
             padding: 20px;
         }
 
+        @media (max-width: 1024px) {
+            body {
+                padding: 10px;
+            }
+        }
+
         .container {
             max-width: 1200px;
             margin: 0 auto;
@@ -45,10 +51,31 @@
             opacity: 0.9;
         }
 
+        @media (max-width: 1024px) {
+            .header {
+                padding: 15px 10px;
+            }
+
+            .header h1 {
+                font-size: 1.6em;
+                margin-bottom: 5px;
+            }
+
+            .header p {
+                font-size: 0.9em;
+            }
+        }
+
         .controls {
             padding: 30px;
             background: #f8f9fa;
             border-bottom: 1px solid #e9ecef;
+        }
+
+        @media (max-width: 1024px) {
+            .controls {
+                padding: 15px 10px;
+            }
         }
 
         .control-group {
@@ -60,6 +87,13 @@
             margin-bottom: 20px;
         }
 
+        @media (max-width: 1024px) {
+            .control-group {
+                gap: 10px;
+                margin-bottom: 10px;
+            }
+        }
+
         .control-item {
             display: flex;
             flex-direction: column;
@@ -67,10 +101,22 @@
             gap: 8px;
         }
 
+        @media (max-width: 1024px) {
+            .control-item {
+                gap: 4px;
+            }
+        }
+
         .control-item label {
             font-weight: 600;
             color: #495057;
             font-size: 0.9em;
+        }
+
+        @media (max-width: 1024px) {
+            .control-item label {
+                font-size: 0.75em;
+            }
         }
 
         .control-item input {
@@ -81,6 +127,14 @@
             width: 100px;
             text-align: center;
             transition: border-color 0.3s;
+        }
+
+        @media (max-width: 1024px) {
+            .control-item input {
+                padding: 8px;
+                font-size: 0.9em;
+                width: 80px;
+            }
         }
 
         .control-item input:focus {
@@ -105,6 +159,13 @@
             padding-top: 15px;
         }
 
+        @media (max-width: 1024px) {
+            .help-section {
+                margin-top: 10px;
+                padding-top: 10px;
+            }
+        }
+
         .help-header {
             font-weight: 600;
             font-size: 1.1em;
@@ -115,6 +176,13 @@
             background: #f8f9fa;
             border-radius: 8px;
             transition: background 0.3s;
+        }
+
+        @media (max-width: 1024px) {
+            .help-header {
+                font-size: 0.9em;
+                padding: 8px;
+            }
         }
 
         .help-header:hover {
@@ -138,6 +206,13 @@
             transition: max-height 0.3s ease-out;
         }
 
+        @media (max-width: 1024px) {
+            .help-content {
+                margin-top: 8px;
+                max-height: 300px;
+            }
+        }
+
         .help-content.collapsed {
             max-height: 0;
         }
@@ -147,6 +222,14 @@
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 12px;
             margin-bottom: 15px;
+        }
+
+        @media (max-width: 1024px) {
+            .help-grid {
+                grid-template-columns: 1fr;
+                gap: 6px;
+                margin-bottom: 8px;
+            }
         }
 
         .help-item {
@@ -159,15 +242,35 @@
             border: 1px solid #e9ecef;
         }
 
+        @media (max-width: 1024px) {
+            .help-item {
+                padding: 6px 8px;
+                gap: 6px;
+            }
+        }
+
         .help-icon {
             font-size: 1.5em;
             flex-shrink: 0;
+        }
+
+        @media (max-width: 1024px) {
+            .help-icon {
+                font-size: 1.2em;
+            }
         }
 
         .help-text {
             font-size: 0.9em;
             color: #495057;
             line-height: 1.4;
+        }
+
+        @media (max-width: 1024px) {
+            .help-text {
+                font-size: 0.75em;
+                line-height: 1.3;
+            }
         }
 
         .help-tips {
@@ -178,10 +281,25 @@
             margin-top: 15px;
         }
 
+        @media (max-width: 1024px) {
+            .help-tips {
+                padding: 8px;
+                margin-top: 8px;
+                border-radius: 6px;
+            }
+        }
+
         .help-tips strong {
             color: #856404;
             display: block;
             margin-bottom: 8px;
+        }
+
+        @media (max-width: 1024px) {
+            .help-tips strong {
+                font-size: 0.8em;
+                margin-bottom: 4px;
+            }
         }
 
         .help-tips ul {
@@ -190,14 +308,33 @@
             color: #856404;
         }
 
+        @media (max-width: 1024px) {
+            .help-tips ul {
+                padding-left: 15px;
+                font-size: 0.75em;
+            }
+        }
+
         .help-tips li {
             margin: 5px 0;
+        }
+
+        @media (max-width: 1024px) {
+            .help-tips li {
+                margin: 3px 0;
+            }
         }
 
         .button-group {
             display: flex;
             gap: 15px;
             justify-content: center;
+        }
+
+        @media (max-width: 1024px) {
+            .button-group {
+                gap: 10px;
+            }
         }
 
         .btn {
@@ -210,6 +347,13 @@
             transition: all 0.3s;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+        }
+
+        @media (max-width: 1024px) {
+            .btn {
+                padding: 8px 16px;
+                font-size: 0.85em;
+            }
         }
 
         .btn-primary {
@@ -236,6 +380,12 @@
             padding: 30px;
         }
 
+        @media (max-width: 1024px) {
+            .results {
+                padding: 15px 10px;
+            }
+        }
+
         .stats {
             display: flex;
             justify-content: space-around;
@@ -245,8 +395,24 @@
             border-radius: 10px;
         }
 
+        @media (max-width: 1024px) {
+            .stats {
+                margin-bottom: 15px;
+                padding: 10px 5px;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+        }
+
         .stat-item {
             text-align: center;
+        }
+
+        @media (max-width: 1024px) {
+            .stat-item {
+                flex: 1 1 auto;
+                min-width: 60px;
+            }
         }
 
         .stat-value {
@@ -255,10 +421,23 @@
             color: #007bff;
         }
 
+        @media (max-width: 1024px) {
+            .stat-value {
+                font-size: 1.1em;
+            }
+        }
+
         .stat-label {
             font-size: 0.9em;
             color: #6c757d;
             margin-top: 5px;
+        }
+
+        @media (max-width: 1024px) {
+            .stat-label {
+                font-size: 0.65em;
+                margin-top: 2px;
+            }
         }
 
         .field-container {
@@ -276,12 +455,26 @@
             min-width: 300px;
         }
 
+        @media (max-width: 1024px) {
+            .field-display {
+                padding: 10px;
+                border-radius: 8px;
+            }
+        }
+
         .field-title {
             text-align: center;
             margin-bottom: 15px;
             font-size: 1.2em;
             font-weight: 600;
             color: #495057;
+        }
+
+        @media (max-width: 1024px) {
+            .field-title {
+                margin-bottom: 8px;
+                font-size: 0.95em;
+            }
         }
 
         .field-grid {
@@ -293,6 +486,13 @@
             margin: 0 auto;
             max-width: 90vw;
             box-sizing: border-box;
+        }
+
+        @media (max-width: 1024px) {
+            .field-grid {
+                padding: 5px;
+                gap: 1px;
+            }
         }
 
         .field-cell {
@@ -446,6 +646,14 @@
             display: none;
         }
 
+        @media (max-width: 1024px) {
+            .game-message {
+                font-size: 1em;
+                padding: 10px;
+                margin-top: 10px;
+            }
+        }
+
         .game-message.win {
             background: #d4edda;
             color: #155724;
@@ -499,15 +707,15 @@
             <div class="control-group">
                 <div class="control-item">
                     <label for="fieldSize">Field Size</label>
-                    <input type="number" id="fieldSize" min="3" max="20" value="10">
+                    <input type="number" id="fieldSize" min="3" max="20" value="8">
                 </div>
                 <div class="control-item">
                     <label for="numBombs">Number of Bombs</label>
-                    <input type="number" id="numBombs" min="0" max="100" value="8">
+                    <input type="number" id="numBombs" min="0" max="100" value="6">
                 </div>
                 <div class="control-item">
                     <label for="numFlowers">Number of Flowers</label>
-                    <input type="number" id="numFlowers" min="0" max="100" value="7">
+                    <input type="number" id="numFlowers" min="0" max="100" value="5">
                 </div>
                 <div class="control-item">
                     <label for="gameSpeed">Game Speed: <span id="speedValue">Normal</span></label>

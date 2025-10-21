@@ -99,6 +99,101 @@
             color: #007bff;
         }
 
+        .help-section {
+            margin-top: 20px;
+            border-top: 2px solid #e9ecef;
+            padding-top: 15px;
+        }
+
+        .help-header {
+            font-weight: 600;
+            font-size: 1.1em;
+            color: #495057;
+            cursor: pointer;
+            user-select: none;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            transition: background 0.3s;
+        }
+
+        .help-header:hover {
+            background: #e9ecef;
+        }
+
+        #help-toggle {
+            display: inline-block;
+            transition: transform 0.3s;
+            font-size: 0.8em;
+        }
+
+        #help-toggle.collapsed {
+            transform: rotate(-90deg);
+        }
+
+        .help-content {
+            margin-top: 15px;
+            max-height: 500px;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+
+        .help-content.collapsed {
+            max-height: 0;
+        }
+
+        .help-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        .help-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+        }
+
+        .help-icon {
+            font-size: 1.5em;
+            flex-shrink: 0;
+        }
+
+        .help-text {
+            font-size: 0.9em;
+            color: #495057;
+            line-height: 1.4;
+        }
+
+        .help-tips {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .help-tips strong {
+            color: #856404;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .help-tips ul {
+            margin: 0;
+            padding-left: 20px;
+            color: #856404;
+        }
+
+        .help-tips li {
+            margin: 5px 0;
+        }
+
         .button-group {
             display: flex;
             gap: 15px;
@@ -453,6 +548,61 @@
                 <button class="btn btn-primary" onclick="generateField()">Generate Field</button>
                 <button class="btn btn-secondary" onclick="startGame()" id="startButton">Start Game</button>
             </div>
+
+            <div class="help-section">
+                <div class="help-header" onclick="toggleHelp()">
+                    <span id="help-toggle" class="collapsed">▼</span> Game Guide
+                </div>
+                <div class="help-content collapsed" id="helpContent">
+                    <div class="help-grid">
+                        <div class="help-item">
+                            <span class="help-icon">🧙‍♂️</span>
+                            <span class="help-text"><strong>Gnome</strong> - Your hero! Walks automatically</span>
+                        </div>
+                        <div class="help-item">
+                            <span class="help-icon">💣</span>
+                            <span class="help-text"><strong>Bomb</strong> - Damages gnome (-1 HP), triggers chain reactions</span>
+                        </div>
+                        <div class="help-item">
+                            <span class="help-icon">🌸</span>
+                            <span class="help-text"><strong>Regular Flower</strong> - Heals +1 HP (max 3)</span>
+                        </div>
+                        <div class="help-item">
+                            <span class="help-icon">🔥</span>
+                            <span class="help-text"><strong>Phoenix Flower</strong> - Heals +1 HP + 10s invincibility! (near 2+ bombs)</span>
+                        </div>
+                        <div class="help-item">
+                            <span class="help-icon">🔮</span>
+                            <span class="help-text"><strong>Sage Flower</strong> - Heals +1 HP + reveals nearby bombs (0 adjacent bombs)</span>
+                        </div>
+                        <div class="help-item">
+                            <span class="help-icon">👻</span>
+                            <span class="help-text"><strong>Ghost Trail</strong> - Shows gnome's last 10 positions (fades with age)</span>
+                        </div>
+                        <div class="help-item">
+                            <span class="help-icon">✨</span>
+                            <span class="help-text"><strong>Invincible Gnome</strong> - Immune to bombs! From Phoenix Flower</span>
+                        </div>
+                        <div class="help-item">
+                            <span class="help-icon">💥</span>
+                            <span class="help-text"><strong>Explosion</strong> - Gnome hit a bomb!</span>
+                        </div>
+                        <div class="help-item">
+                            <span class="help-icon">💀</span>
+                            <span class="help-text"><strong>Dead</strong> - Game Over (0 HP)</span>
+                        </div>
+                    </div>
+                    <div class="help-tips">
+                        <strong>💡 Tips:</strong>
+                        <ul>
+                            <li>Ghost trail clears when gnome teleports (after bomb hit)</li>
+                            <li>Chain reactions can trigger multiple bombs!</li>
+                            <li>Collect all flowers to win</li>
+                            <li>Adjust speed anytime during gameplay</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="results" id="results" style="display: none;">
@@ -688,6 +838,7 @@
                 } else {
                     // Gnome survives but is hurt, respawn elsewhere
                     setTimeout(() => {
+                        positionHistory = []; // Clear ghost trail on teleport/respawn
                         respawnGnome();
                         gnomeStatus = gnomeStatus === 'invincible' ? 'invincible' : 'happy';
                         updateFieldDisplay();
@@ -851,6 +1002,19 @@
             // If game is running, restart with new speed
             if (gnomeTimer) {
                 startGnomeMovement();
+            }
+        }
+
+        function toggleHelp() {
+            const content = document.getElementById('helpContent');
+            const toggle = document.getElementById('help-toggle');
+
+            if (content.classList.contains('collapsed')) {
+                content.classList.remove('collapsed');
+                toggle.classList.remove('collapsed');
+            } else {
+                content.classList.add('collapsed');
+                toggle.classList.add('collapsed');
             }
         }
 

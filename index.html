@@ -88,6 +88,17 @@
             border-color: #007bff;
         }
 
+        .control-item input[type="range"] {
+            width: 150px;
+            padding: 0;
+            cursor: pointer;
+        }
+
+        #speedValue {
+            font-weight: bold;
+            color: #007bff;
+        }
+
         .button-group {
             display: flex;
             gap: 15px;
@@ -433,6 +444,10 @@
                     <label for="numFlowers">Number of Flowers</label>
                     <input type="number" id="numFlowers" min="0" max="100" value="7">
                 </div>
+                <div class="control-item">
+                    <label for="gameSpeed">Game Speed: <span id="speedValue">Normal</span></label>
+                    <input type="range" id="gameSpeed" min="1" max="5" value="3" oninput="updateSpeedLabel()">
+                </div>
             </div>
             <div class="button-group">
                 <button class="btn btn-primary" onclick="generateField()">Generate Field</button>
@@ -665,6 +680,7 @@
                     // Gnome dies
                     setTimeout(() => {
                         gnomeStatus = 'dead';
+                        positionHistory = []; // Clear ghost trail on death
                         updateFieldDisplay();
                         stopGnomeMovement();
                         showGameMessage('💀 Game Over! The gnome died from explosions!', 'lose');
@@ -749,6 +765,7 @@
                                     if (gnomeHealth <= 0) {
                                         setTimeout(() => {
                                             gnomeStatus = 'dead';
+                                            positionHistory = []; // Clear ghost trail on death
                                             updateFieldDisplay();
                                             stopGnomeMovement();
                                             showGameMessage('💀 Game Over! Chain reaction!', 'lose');
@@ -807,9 +824,40 @@
             showStats(currentFieldSize, bombCount, flowerCount);
         }
 
+        function getSpeedInterval() {
+            const speed = parseInt(document.getElementById('gameSpeed').value);
+            // Speed 1 = 1600ms (Very Slow), Speed 3 = 800ms (Normal), Speed 5 = 200ms (Very Fast)
+            const intervals = {
+                1: 1600,  // Very Slow
+                2: 1200,  // Slow
+                3: 800,   // Normal
+                4: 400,   // Fast
+                5: 200    // Very Fast
+            };
+            return intervals[speed] || 800;
+        }
+
+        function updateSpeedLabel() {
+            const speed = parseInt(document.getElementById('gameSpeed').value);
+            const labels = {
+                1: 'Very Slow',
+                2: 'Slow',
+                3: 'Normal',
+                4: 'Fast',
+                5: 'Very Fast'
+            };
+            document.getElementById('speedValue').textContent = labels[speed] || 'Normal';
+
+            // If game is running, restart with new speed
+            if (gnomeTimer) {
+                startGnomeMovement();
+            }
+        }
+
         function startGnomeMovement() {
             clearInterval(gnomeTimer);
-            gnomeTimer = setInterval(moveGnome, 800); // Move every 800ms
+            const interval = getSpeedInterval();
+            gnomeTimer = setInterval(moveGnome, interval);
         }
 
         function stopGnomeMovement() {

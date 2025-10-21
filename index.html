@@ -243,13 +243,12 @@
         }
 
         .cell-ghost-trail {
-            background: rgba(144, 238, 144, 0.3);
+            background: rgba(144, 238, 144, 0.6);
             position: relative;
         }
 
         .cell-ghost-trail::after {
             content: '👻';
-            opacity: 0.5;
             font-size: 0.7em;
         }
 
@@ -437,7 +436,7 @@
             </div>
             <div class="button-group">
                 <button class="btn btn-primary" onclick="generateField()">Generate Field</button>
-                <button class="btn btn-secondary" onclick="generateMultiple()">Generate Examples</button>
+                <button class="btn btn-secondary" onclick="startGame()" id="startButton">Start Game</button>
             </div>
         </div>
 
@@ -456,13 +455,11 @@
         let currentFieldSize = 0;
         let gnomeHealth = 3;
         let flowersCollected = 0;
-        let gnomeStatus = 'happy'; // 'happy', 'collecting', 'exploding', 'dead', 'invincible', 'rewinding'
+        let gnomeStatus = 'happy'; // 'happy', 'collecting', 'exploding', 'dead', 'invincible'
 
-        // Feature 1: Time Rewind Trail
-        let positionHistory = []; // Track last 10 positions
-        let rewindCharges = 0; // Number of rewind power-ups collected
+        // Feature 1: Ghost Trail
+        let positionHistory = []; // Track last 10 positions with fading effect
         const MAX_HISTORY = 10;
-        const REWIND_STEPS = 5;
 
         // Feature 2: Chain Reactions
         let chainReactionInProgress = false;
@@ -475,9 +472,7 @@
 
         // Bomb and flower field generation logic
         function createBombField(size, numBombs, numFlowers) {
-            // Calculate rewind power-ups (1-2 per game)
-            const numRewinds = Math.floor(Math.random() * 2) + 1;
-            const totalItems = numBombs + numFlowers + numRewinds;
+            const totalItems = numBombs + numFlowers;
             if (totalItems > size * size) {
                 throw new Error(`Total items (${totalItems}) cannot exceed field size (${size * size})`);
             }
@@ -516,13 +511,6 @@
             flowerPositions.forEach(([row, col]) => {
                 field[row][col] = 2; // 2 = flower
             });
-
-            // Place rewind power-ups
-            for (let i = 0; i < numRewinds; i++) {
-                const randomIndex = Math.floor(Math.random() * positions.length);
-                const [row, col] = positions.splice(randomIndex, 1)[0];
-                field[row][col] = 3; // 3 = rewind power-up
-            }
 
             // Feature 3: Mutate flowers based on bomb proximity
             mutateFlowers(field, size);
@@ -656,31 +644,10 @@
                     }
                 }, 300);
 
-            } else if (cellContent === 3) { // Rewind power-up
-                gnomeStatus = 'rewinding';
-                rewindCharges++;
-                currentField[gnomePosition.row][gnomePosition.col] = 0;
-
-                setTimeout(() => {
-                    gnomeStatus = gnomeStatus === 'invincible' ? 'invincible' : 'happy';
-                    updateFieldDisplay();
-                    showGameMessage(`⏪ Rewind power-up collected! Charges: ${rewindCharges}`, 'win');
-                    setTimeout(() => {
-                        const msg = document.getElementById('gameMessage');
-                        if (msg) msg.style.display = 'none';
-                    }, 2000);
-                }, 500);
-
             } else if (cellContent === 1) { // Bomb
                 // Feature 3: Check invincibility
                 if (gnomeStatus === 'invincible') {
                     // Invincible gnomes are protected!
-                    return;
-                }
-
-                // Feature 1: Auto-use rewind if about to die
-                if (gnomeHealth - 1 <= 0 && rewindCharges > 0) {
-                    activateRewind();
                     return;
                 }
 
@@ -713,36 +680,6 @@
             } else {
                 gnomeStatus = gnomeStatus === 'invincible' ? 'invincible' : 'happy';
             }
-        }
-
-        // Feature 1: Activate rewind
-        function activateRewind() {
-            if (rewindCharges <= 0 || positionHistory.length < REWIND_STEPS) return;
-
-            rewindCharges--;
-            gnomeStatus = 'rewinding';
-
-            // Go back 5 steps (or less if history is shorter)
-            const stepsBack = Math.min(REWIND_STEPS, positionHistory.length);
-            const targetPosition = positionHistory[positionHistory.length - stepsBack];
-
-            // Remove the rewound positions from history
-            positionHistory.splice(positionHistory.length - stepsBack);
-
-            // Move gnome to previous position
-            gnomePosition = { ...targetPosition };
-
-            updateFieldDisplay();
-
-            setTimeout(() => {
-                gnomeStatus = gnomeStatus === 'invincible' ? 'invincible' : 'happy';
-                updateFieldDisplay();
-                showGameMessage(`⏪ Rewind activated! Went back ${stepsBack} steps. Charges left: ${rewindCharges}`, 'win');
-                setTimeout(() => {
-                    const msg = document.getElementById('gameMessage');
-                    if (msg) msg.style.display = 'none';
-                }, 2000);
-            }, 500);
         }
 
         // Feature 3: Activate invincibility from Phoenix Flower
@@ -901,8 +838,14 @@
                     const cell = document.createElement('div');
                     cell.className = 'field-cell';
 
-                    // Feature 1: Check if this is part of ghost trail
-                    const isGhostTrail = positionHistory.some(pos => pos.row === i && pos.col === j);
+                    // Feature 1: Check if this is part of ghost trail and calculate opacity
+                    let ghostTrailIndex = -1;
+                    for (let idx = 0; idx < positionHistory.length; idx++) {
+                        if (positionHistory[idx].row === i && positionHistory[idx].col === j) {
+                            ghostTrailIndex = idx;
+                            break;
+                        }
+                    }
 
                     // Check if gnome is at this position
                     if (gnomePosition.row === i && gnomePosition.col === j) {
@@ -915,14 +858,15 @@
                             cell.textContent = '🌟';
                         } else if (gnomeStatus === 'invincible') {
                             cell.textContent = '✨🧙‍♂️✨';
-                        } else if (gnomeStatus === 'rewinding') {
-                            cell.textContent = '⏪';
                         } else {
                             cell.textContent = '🧙‍♂️';
                         }
-                    } else if (isGhostTrail && gnomeStatus !== 'dead') {
-                        // Feature 1: Show ghost trail
+                    } else if (ghostTrailIndex >= 0 && gnomeStatus !== 'dead') {
+                        // Feature 1: Show ghost trail with fading opacity
+                        // Older positions (lower index) are more transparent
+                        const opacity = (ghostTrailIndex + 1) / positionHistory.length;
                         cell.className += ' cell-ghost-trail';
+                        cell.style.opacity = opacity * 0.5; // Max 0.5 opacity for newest trail
                     } else if (field[i][j] === 1) {
                         // Feature 3: Check if bomb is revealed
                         const bombKey = `${i},${j}`;
@@ -935,10 +879,6 @@
                     } else if (field[i][j] === 2) {
                         cell.className += ' cell-flower';
                         cell.textContent = '🌸';
-                    } else if (field[i][j] === 3) {
-                        // Feature 1: Rewind power-up
-                        cell.className += ' cell-rewind-powerup';
-                        cell.textContent = '⏪';
                     } else if (field[i][j] === 4) {
                         // Feature 3: Phoenix Flower
                         cell.className += ' cell-phoenix-flower';
@@ -991,10 +931,6 @@
                     <div class="stat-label">Flowers Used</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-value">⏪ ${rewindCharges}</div>
-                    <div class="stat-label">Rewind Charges</div>
-                </div>
-                <div class="stat-item">
                     <div class="stat-value">${invincibilityDisplay}</div>
                     <div class="stat-label">Invincibility</div>
                 </div>
@@ -1045,7 +981,6 @@
 
                 // Reset new feature states
                 positionHistory = [];
-                rewindCharges = 0;
                 chainReactionInProgress = false;
                 explodedBombs = new Set();
                 revealedBombs = new Set();
@@ -1074,48 +1009,23 @@
                 // Show bomb & flower field
                 const bombFieldDisplay = renderField(bombField, 'Bomb & Flower Field');
                 fieldContainer.appendChild(bombFieldDisplay);
-                
-                // Start gnome movement
-                startGnomeMovement();
-                
+
+                // Stop any existing gnome movement
+                stopGnomeMovement();
+
             } catch (error) {
                 showError(error.message);
             }
         }
 
-        function generateMultiple() {
-            const configurations = [
-                { size: 5, bombs: 3, flowers: 2, title: '5×5 Easy' },
-                { size: 8, bombs: 6, flowers: 4, title: '8×8 Medium' },
-                { size: 12, bombs: 12, flowers: 8, title: '12×12 Hard' }
-            ];
+        function startGame() {
+            if (!currentField) {
+                showError('Please generate a field first!');
+                return;
+            }
 
-            // Stop gnome movement for multiple field view
-            stopGnomeMovement();
-            currentField = null;
-            currentFieldSize = 0;
-
-            const results = document.getElementById('results');
-            results.style.display = 'block';
-            
-            // Clear previous results
-            document.getElementById('stats').innerHTML = '';
-            const fieldContainer = document.getElementById('fieldContainer');
-            fieldContainer.innerHTML = '';
-
-            configurations.forEach(config => {
-                try {
-                    const bombField = createBombField(config.size, config.bombs, config.flowers);
-                    const totalItems = config.bombs + config.flowers;
-                    const density = ((totalItems / (config.size * config.size)) * 100).toFixed(1);
-                    const title = `${config.title} (💣${config.bombs} 🌸${config.flowers}, ${density}%)`;
-                    
-                    const fieldDisplay = renderField(bombField, title);
-                    fieldContainer.appendChild(fieldDisplay);
-                } catch (error) {
-                    console.error(`Error generating ${config.title}:`, error);
-                }
-            });
+            // Start gnome movement
+            startGnomeMovement();
         }
 
         // Initialize with default field on page load

@@ -36,18 +36,18 @@
         .header {
             background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
             color: white;
-            padding: 30px;
+            padding: 15px;
             text-align: center;
         }
 
         .header h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
+            font-size: 1.8em;
+            margin-bottom: 5px;
             text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
         }
 
         .header p {
-            font-size: 1.2em;
+            font-size: 0.95em;
             opacity: 0.9;
         }
 
@@ -67,9 +67,13 @@
         }
 
         .controls {
-            padding: 30px;
+            padding: 15px;
             background: #f8f9fa;
             border-bottom: 1px solid #e9ecef;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
         }
 
         @media (max-width: 1024px) {
@@ -85,10 +89,11 @@
         .control-group {
             display: flex;
             flex-wrap: wrap;
-            gap: 20px;
+            gap: 10px;
             align-items: center;
-            justify-content: center;
-            margin-bottom: 20px;
+            justify-content: flex-start;
+            margin-bottom: 0;
+            flex: 1;
         }
 
         @media (max-width: 1024px) {
@@ -170,9 +175,10 @@
         }
 
         .help-section {
-            margin-top: 20px;
-            border-top: 2px solid #e9ecef;
-            padding-top: 15px;
+            margin-top: 0;
+            border-top: none;
+            padding-top: 0;
+            flex-shrink: 0;
         }
 
         @media (max-width: 1024px) {
@@ -186,14 +192,15 @@
 
         .help-header {
             font-weight: 600;
-            font-size: 1.1em;
-            color: #495057;
+            font-size: 0.9em;
+            color: #007bff;
             cursor: pointer;
             user-select: none;
-            padding: 10px;
-            background: #f8f9fa;
+            padding: 8px 10px;
+            background: transparent;
             border-radius: 8px;
             transition: background 0.3s;
+            text-decoration: underline;
         }
 
         @media (max-width: 1024px) {
@@ -212,38 +219,11 @@
         }
 
         #help-toggle {
-            display: inline-block;
-            transition: transform 0.3s;
-            font-size: 0.8em;
-        }
-
-        #help-toggle.collapsed {
-            transform: rotate(-90deg);
-        }
-
-        @media (max-width: 1024px) {
-            #help-toggle {
-                display: none;
-            }
+            display: none;
         }
 
         .help-content {
-            margin-top: 15px;
-            max-height: 500px;
-            overflow: hidden;
-            transition: max-height 0.3s ease-out;
-        }
-
-        @media (max-width: 1024px) {
-            .help-content {
-                margin-top: 4px;
-                max-height: 200px;
-                overflow-y: auto;
-            }
-        }
-
-        .help-content.collapsed {
-            max-height: 0;
+            display: none;
         }
 
         .help-modal {
@@ -294,12 +274,6 @@
 
         .help-modal-close:hover {
             color: #000;
-        }
-
-        @media (max-width: 1024px) {
-            .help-content {
-                display: none;
-            }
         }
 
         .help-grid {
@@ -412,8 +386,9 @@
 
         .button-group {
             display: flex;
-            gap: 15px;
-            justify-content: center;
+            gap: 10px;
+            justify-content: flex-start;
+            flex-shrink: 0;
         }
 
         @media (max-width: 1024px) {
@@ -465,7 +440,7 @@
         }
 
         .results {
-            padding: 30px;
+            padding: 15px;
         }
 
         @media (max-width: 1024px) {
@@ -477,10 +452,12 @@
         .stats {
             display: flex;
             justify-content: space-around;
-            margin-bottom: 30px;
-            padding: 20px;
+            margin-bottom: 15px;
+            padding: 12px;
             background: #f8f9fa;
             border-radius: 10px;
+            flex-wrap: wrap;
+            gap: 8px;
         }
 
         @media (max-width: 1024px) {
@@ -504,7 +481,7 @@
         }
 
         .stat-value {
-            font-size: 1.8em;
+            font-size: 1.3em;
             font-weight: bold;
             color: #007bff;
         }
@@ -516,9 +493,9 @@
         }
 
         .stat-label {
-            font-size: 0.9em;
+            font-size: 0.75em;
             color: #6c757d;
-            margin-top: 5px;
+            margin-top: 3px;
         }
 
         @media (max-width: 1024px) {
@@ -538,7 +515,7 @@
         .field-display {
             background: white;
             border-radius: 10px;
-            padding: 20px;
+            padding: 15px;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
             min-width: 300px;
         }
@@ -552,8 +529,8 @@
 
         .field-title {
             text-align: center;
-            margin-bottom: 15px;
-            font-size: 1.2em;
+            margin-bottom: 10px;
+            font-size: 1em;
             font-weight: 600;
             color: #495057;
         }

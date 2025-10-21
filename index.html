@@ -53,16 +53,16 @@
 
         @media (max-width: 1024px) {
             .header {
-                padding: 8px 10px;
+                padding: 6px 10px;
             }
 
             .header h1 {
-                font-size: 1.2em;
-                margin-bottom: 3px;
+                font-size: 1.1em;
+                margin-bottom: 0;
             }
 
             .header p {
-                font-size: 0.75em;
+                display: none; /* Hide subtitle on tablets to save space */
             }
         }
 
@@ -74,7 +74,11 @@
 
         @media (max-width: 1024px) {
             .controls {
-                padding: 8px 10px;
+                padding: 6px 8px;
+                display: grid;
+                grid-template-columns: 1fr auto;
+                gap: 4px;
+                align-items: center;
             }
         }
 
@@ -89,8 +93,11 @@
 
         @media (max-width: 1024px) {
             .control-group {
-                gap: 6px;
-                margin-bottom: 6px;
+                gap: 4px;
+                margin-bottom: 0;
+                flex-wrap: wrap;
+                align-items: flex-end;
+                justify-content: flex-start;
             }
         }
 
@@ -115,7 +122,8 @@
 
         @media (max-width: 1024px) {
             .control-item label {
-                font-size: 0.7em;
+                font-size: 0.65em;
+                white-space: nowrap;
             }
         }
 
@@ -131,9 +139,9 @@
 
         @media (max-width: 1024px) {
             .control-item input {
-                padding: 6px;
-                font-size: 0.85em;
-                width: 70px;
+                padding: 4px;
+                font-size: 0.75em;
+                width: 50px;
             }
         }
 
@@ -146,6 +154,12 @@
             width: 150px;
             padding: 0;
             cursor: pointer;
+        }
+
+        @media (max-width: 1024px) {
+            .control-item input[type="range"] {
+                width: 80px;
+            }
         }
 
         #speedValue {
@@ -161,8 +175,10 @@
 
         @media (max-width: 1024px) {
             .help-section {
-                margin-top: 6px;
-                padding-top: 6px;
+                margin-top: 0;
+                padding-top: 4px;
+                grid-column: 1 / -1;
+                border-top: 1px solid #e9ecef;
             }
         }
 
@@ -208,8 +224,9 @@
 
         @media (max-width: 1024px) {
             .help-content {
-                margin-top: 8px;
-                max-height: 300px;
+                margin-top: 4px;
+                max-height: 200px;
+                overflow-y: auto;
             }
         }
 
@@ -333,7 +350,8 @@
 
         @media (max-width: 1024px) {
             .button-group {
-                gap: 6px;
+                gap: 4px;
+                flex-direction: column;
             }
         }
 
@@ -351,8 +369,9 @@
 
         @media (max-width: 1024px) {
             .btn {
-                padding: 6px 12px;
-                font-size: 0.75em;
+                padding: 4px 8px;
+                font-size: 0.65em;
+                letter-spacing: 0.3px;
             }
         }
 
@@ -706,25 +725,25 @@
         <div class="controls">
             <div class="control-group">
                 <div class="control-item">
-                    <label for="fieldSize">Field Size</label>
+                    <label for="fieldSize">Size</label>
                     <input type="number" id="fieldSize" min="3" max="20" value="8">
                 </div>
                 <div class="control-item">
-                    <label for="numBombs">Number of Bombs</label>
+                    <label for="numBombs">💣</label>
                     <input type="number" id="numBombs" min="0" max="100" value="6">
                 </div>
                 <div class="control-item">
-                    <label for="numFlowers">Number of Flowers</label>
+                    <label for="numFlowers">🌸</label>
                     <input type="number" id="numFlowers" min="0" max="100" value="5">
                 </div>
                 <div class="control-item">
-                    <label for="gameSpeed">Game Speed: <span id="speedValue">Normal</span></label>
+                    <label for="gameSpeed">Speed: <span id="speedValue">3x</span></label>
                     <input type="range" id="gameSpeed" min="1" max="5" value="3" oninput="updateSpeedLabel()">
                 </div>
             </div>
             <div class="button-group">
-                <button class="btn btn-primary" onclick="generateField()">Generate Field</button>
-                <button class="btn btn-secondary" onclick="startGame()" id="startButton">Start Game</button>
+                <button class="btn btn-primary" onclick="generateField()">Generate</button>
+                <button class="btn btn-secondary" onclick="startGame()" id="startButton">Start</button>
             </div>
 
             <div class="help-section">
@@ -1142,13 +1161,13 @@
         function updateSpeedLabel() {
             const speed = parseInt(document.getElementById('gameSpeed').value);
             const labels = {
-                1: 'Very Slow',
-                2: 'Slow',
-                3: 'Normal',
-                4: 'Fast',
-                5: 'Very Fast'
+                1: '1x',
+                2: '2x',
+                3: '3x',
+                4: '4x',
+                5: '5x'
             };
-            document.getElementById('speedValue').textContent = labels[speed] || 'Normal';
+            document.getElementById('speedValue').textContent = labels[speed] || '3x';
 
             // If game is running, restart with new speed
             if (gnomeTimer) {

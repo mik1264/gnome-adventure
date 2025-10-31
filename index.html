@@ -169,6 +169,30 @@
             }
         }
 
+        .control-item select {
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 1em;
+            width: 150px;
+            cursor: pointer;
+            transition: border-color 0.3s;
+            background: white;
+        }
+
+        @media (max-width: 1024px) {
+            .control-item select {
+                padding: 4px;
+                font-size: 0.75em;
+                width: 90px;
+            }
+        }
+
+        .control-item select:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+
         #speedValue {
             font-weight: bold;
             color: #007bff;
@@ -583,6 +607,13 @@
             color: #6c757d;
         }
 
+        .cell-hidden {
+            background: #c0c0c0;
+            color: #808080;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
         .cell-bomb {
             background: #ff6b6b;
             color: white;
@@ -786,6 +817,17 @@
                     <label for="gameSpeed">Speed: <span id="speedValue">3x</span></label>
                     <input type="range" id="gameSpeed" min="1" max="5" value="3" oninput="updateSpeedLabel()">
                 </div>
+                <div class="control-item">
+                    <label for="explorationAlgo">AI Style</label>
+                    <select id="explorationAlgo" onchange="updateAlgorithm()">
+                        <option value="wanderer" selected>Wanderer</option>
+                        <option value="brave">Brave Explorer</option>
+                        <option value="treasure-hunter">Treasure Hunter</option>
+                        <option value="scaredy-cat">Scaredy Cat</option>
+                        <option value="scout">Scout</option>
+                        <option value="drifter">Drifter</option>
+                    </select>
+                </div>
             </div>
             <div class="button-group">
                 <button class="btn btn-secondary" onclick="generateField()">Generate</button>
@@ -915,6 +957,17 @@
         let invincibilityTimer = null;
         let invincibilityTimeLeft = 0;
 
+        // Exploration Algorithm Feature
+        let explorationAlgorithm = 'wanderer'; // Current selected algorithm
+        let visitedCells = new Set(); // Track "row,col" strings
+        let knownBombs = new Set(); // Remember bomb locations as "row,col" strings
+        let knownFlowers = new Set(); // Remember flower locations as "row,col" strings
+        let lastMoveDirection = null; // For Drifter algorithm {row, col}
+
+        // Minesweeper-style Fog of War
+        let revealedCells = new Set(); // Track which cells have been revealed
+        let cellBombCounts = new Map(); // Map "row,col" -> number of adjacent bombs
+
         // Bomb and flower field generation logic
         function createBombField(size, numBombs, numFlowers) {
             const totalItems = numBombs + numFlowers;
@@ -1007,6 +1060,385 @@
             }
         }
 
+        // Helper Functions for Exploration Algorithms
+
+        // Reveal a cell and calculate its adjacent bomb count (Minesweeper-style)
+        function revealCell(row, col) {
+            const key = `${row},${col}`;
+
+            // Mark as revealed
+            revealedCells.add(key);
+
+            // Calculate adjacent bomb count
+            const neighbors = [
+                [-1, -1], [-1, 0], [-1, 1],
+                [0, -1],           [0, 1],
+                [1, -1],  [1, 0],  [1, 1]
+            ];
+
+            let bombCount = 0;
+            for (const [dr, dc] of neighbors) {
+                const newRow = row + dr;
+                const newCol = col + dc;
+
+                if (newRow >= 0 && newRow < currentFieldSize &&
+                    newCol >= 0 && newCol < currentFieldSize) {
+                    if (currentField[newRow][newCol] === 1) {
+                        bombCount++;
+                    }
+                }
+            }
+
+            // Store bomb count
+            cellBombCounts.set(key, bombCount);
+
+            // Update known bombs/flowers based on what's in THIS cell
+            const content = currentField[row][col];
+            if (content === 1) {
+                knownBombs.add(key);
+            } else if (content === 2 || content === 4) {
+                knownFlowers.add(key);
+            }
+        }
+
+        // Get what gnome can see in adjacent cells (Minesweeper fog of war)
+        function getCellsInVision() {
+            const neighbors = [
+                [-1, -1], [-1, 0], [-1, 1],
+                [0, -1],           [0, 1],
+                [1, -1],  [1, 0],  [1, 1]
+            ];
+
+            return neighbors
+                .map(([dr, dc]) => ({
+                    row: gnomePosition.row + dr,
+                    col: gnomePosition.col + dc
+                }))
+                .filter(({row, col}) =>
+                    row >= 0 && row < currentFieldSize &&
+                    col >= 0 && col < currentFieldSize
+                )
+                .map(({row, col}) => {
+                    const key = `${row},${col}`;
+                    const isRevealed = revealedCells.has(key);
+
+                    return {
+                        row,
+                        col,
+                        revealed: isRevealed,
+                        content: isRevealed ? currentField[row][col] : null, // null = hidden
+                        bombCount: isRevealed ? cellBombCounts.get(key) : null
+                    };
+                });
+        }
+
+        // Check if a position is adjacent to bombs (using vision + memory)
+        function isAdjacentToBomb(row, col) {
+            const neighbors = [
+                [-1, -1], [-1, 0], [-1, 1],
+                [0, -1],           [0, 1],
+                [1, -1],  [1, 0],  [1, 1]
+            ];
+
+            for (const [dr, dc] of neighbors) {
+                const newRow = row + dr;
+                const newCol = col + dc;
+
+                // Check if in bounds
+                if (newRow >= 0 && newRow < currentFieldSize &&
+                    newCol >= 0 && newCol < currentFieldSize) {
+
+                    // Check visible bombs
+                    if (currentField[newRow][newCol] === 1) {
+                        return true;
+                    }
+
+                    // Check remembered bombs
+                    if (knownBombs.has(`${newRow},${newCol}`)) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Count bombs adjacent to a position (for danger scoring)
+        function countAdjacentBombsAt(row, col) {
+            const neighbors = [
+                [-1, -1], [-1, 0], [-1, 1],
+                [0, -1],           [0, 1],
+                [1, -1],  [1, 0],  [1, 1]
+            ];
+
+            let count = 0;
+            for (const [dr, dc] of neighbors) {
+                const newRow = row + dr;
+                const newCol = col + dc;
+
+                if (newRow >= 0 && newRow < currentFieldSize &&
+                    newCol >= 0 && newCol < currentFieldSize) {
+
+                    // Check visible bombs
+                    if (currentField[newRow][newCol] === 1) {
+                        count++;
+                    }
+                    // Also check remembered bombs
+                    else if (knownBombs.has(`${newRow},${newCol}`)) {
+                        count++;
+                    }
+                }
+            }
+            return count;
+        }
+
+        // Update memory after each move (Minesweeper fog of war)
+        function updateGnomeMemory() {
+            // Mark current cell as visited
+            const currentKey = `${gnomePosition.row},${gnomePosition.col}`;
+            visitedCells.add(currentKey);
+
+            // Reveal current cell if not already revealed
+            if (!revealedCells.has(currentKey)) {
+                revealCell(gnomePosition.row, gnomePosition.col);
+            }
+
+            // Note: Knowledge of bombs/flowers is now handled in revealCell()
+            // Gnomes can only learn about cells they visit or have visited
+        }
+
+        // Find closest known flower using Manhattan distance
+        function findClosestKnownFlower() {
+            if (knownFlowers.size === 0) return null;
+
+            let closest = null;
+            let minDistance = Infinity;
+
+            for (const flowerKey of knownFlowers) {
+                const [row, col] = flowerKey.split(',').map(Number);
+                const distance = Math.abs(gnomePosition.row - row) + Math.abs(gnomePosition.col - col);
+
+                if (distance < minDistance) {
+                    minDistance = distance;
+                    closest = { row, col };
+                }
+            }
+
+            return closest;
+        }
+
+        // Calculate Manhattan distance between two points
+        function manhattanDistance(row1, col1, row2, col2) {
+            return Math.abs(row1 - row2) + Math.abs(col1 - col2);
+        }
+
+        // Exploration Algorithm Functions
+
+        // Wanderer: Pure random walk
+        function algorithmWanderer(validMoves) {
+            return validMoves[Math.floor(Math.random() * validMoves.length)];
+        }
+
+        // Brave Explorer: Prioritizes unexplored territory
+        function algorithmBrave(validMoves) {
+            // Filter for unexplored cells
+            const unexploredMoves = validMoves.filter(move => {
+                const destRow = gnomePosition.row + move.row;
+                const destCol = gnomePosition.col + move.col;
+                return !visitedCells.has(`${destRow},${destCol}`);
+            });
+
+            // If unexplored cells exist, pick random from them
+            if (unexploredMoves.length > 0) {
+                return unexploredMoves[Math.floor(Math.random() * unexploredMoves.length)];
+            }
+
+            // Otherwise, pick random from all valid moves
+            return validMoves[Math.floor(Math.random() * validMoves.length)];
+        }
+
+        // Treasure Hunter: Greedy flower collection (fog of war)
+        function algorithmTreasureHunter(validMoves) {
+            // 1. Check known flowers in adjacent cells (from memory)
+            for (const move of validMoves) {
+                const destRow = gnomePosition.row + move.row;
+                const destCol = gnomePosition.col + move.col;
+                const key = `${destRow},${destCol}`;
+
+                // If we know there's a flower here, go for it!
+                if (knownFlowers.has(key)) {
+                    return move;
+                }
+            }
+
+            // 2. If known flowers exist, move toward nearest
+            const closestFlower = findClosestKnownFlower();
+            if (closestFlower) {
+                // Pick move that minimizes distance to closest flower
+                let bestMove = validMoves[0];
+                let bestDistance = Infinity;
+
+                for (const move of validMoves) {
+                    const destRow = gnomePosition.row + move.row;
+                    const destCol = gnomePosition.col + move.col;
+                    const distance = manhattanDistance(destRow, destCol, closestFlower.row, closestFlower.col);
+
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        bestMove = move;
+                    }
+                }
+
+                return bestMove;
+            }
+
+            // 3. Otherwise, prefer unrevealed cells (explore for flowers!)
+            const unrevealedMoves = validMoves.filter(move => {
+                const destRow = gnomePosition.row + move.row;
+                const destCol = gnomePosition.col + move.col;
+                return !revealedCells.has(`${destRow},${destCol}`);
+            });
+
+            if (unrevealedMoves.length > 0) {
+                return unrevealedMoves[Math.floor(Math.random() * unrevealedMoves.length)];
+            }
+
+            // 4. Fallback: random valid move
+            return validMoves[Math.floor(Math.random() * validMoves.length)];
+        }
+
+        // Scaredy Cat: Risk-avoidant, survival-focused (fog of war)
+        function algorithmScaredyCat(validMoves) {
+            // If invincible, act brave
+            if (gnomeStatus === 'invincible') {
+                return algorithmBrave(validMoves);
+            }
+
+            // Calculate danger score for each move
+            const scoredMoves = validMoves.map(move => {
+                const destRow = gnomePosition.row + move.row;
+                const destCol = gnomePosition.col + move.col;
+                const key = `${destRow},${destCol}`;
+
+                let danger = 0;
+
+                // Check if we know there's a bomb here
+                if (knownBombs.has(key)) {
+                    danger += 100; // Known bomb = instant death
+                }
+
+                // If cell is revealed, use its bomb count
+                if (revealedCells.has(key)) {
+                    const bombCount = cellBombCounts.get(key) || 0;
+                    danger += bombCount * 10;
+                } else {
+                    // Unrevealed cells have unknown risk
+                    danger += 5; // Higher penalty for unknown
+                }
+
+                return { move, danger };
+            });
+
+            // Find minimum danger score
+            const minDanger = Math.min(...scoredMoves.map(s => s.danger));
+
+            // Get all moves with minimum danger
+            const safestMoves = scoredMoves.filter(s => s.danger === minDanger);
+
+            // Among safest, prefer revealed cells (known to be safe)
+            const revealedSafe = safestMoves.filter(s => {
+                const destRow = gnomePosition.row + s.move.row;
+                const destCol = gnomePosition.col + s.move.col;
+                return revealedCells.has(`${destRow},${destCol}`);
+            });
+
+            if (revealedSafe.length > 0) {
+                return revealedSafe[Math.floor(Math.random() * revealedSafe.length)].move;
+            }
+
+            // Otherwise pick random from safest moves
+            return safestMoves[Math.floor(Math.random() * safestMoves.length)].move;
+        }
+
+        // Scout: Balanced, intelligent decision-making (fog of war)
+        function algorithmScout(validMoves) {
+            const bombPenalty = (gnomeStatus === 'invincible') ? 0 : -30;
+
+            const scoredMoves = validMoves.map(move => {
+                const destRow = gnomePosition.row + move.row;
+                const destCol = gnomePosition.col + move.col;
+                const key = `${destRow},${destCol}`;
+
+                let score = 0;
+
+                // Check if we know there's a flower here
+                if (knownFlowers.has(key)) {
+                    score += 100; // Known flower = big win
+                }
+
+                // Move toward nearest known flower
+                const closestFlower = findClosestKnownFlower();
+                if (closestFlower) {
+                    const currentDist = manhattanDistance(gnomePosition.row, gnomePosition.col, closestFlower.row, closestFlower.col);
+                    const newDist = manhattanDistance(destRow, destCol, closestFlower.row, closestFlower.col);
+
+                    if (newDist < currentDist) {
+                        score += 20; // Moving closer to flower
+                    } else if (newDist > currentDist) {
+                        score -= 10; // Moving away from flower
+                    }
+                }
+
+                // Unrevealed cells are valuable (exploration)
+                if (!revealedCells.has(key)) {
+                    score += 15;
+                } else {
+                    score -= 5; // Slightly discourage revisiting
+                }
+
+                // Bomb danger (from revealed cells)
+                if (revealedCells.has(key)) {
+                    const bombCount = cellBombCounts.get(key) || 0;
+                    score += bombCount * bombPenalty;
+                }
+
+                // Known bombs are death
+                if (knownBombs.has(key)) {
+                    score -= 200;
+                }
+
+                // Add slight randomness for variety (±5%)
+                score *= (0.95 + Math.random() * 0.1);
+
+                return { move, score };
+            });
+
+            // Find maximum score
+            const maxScore = Math.max(...scoredMoves.map(s => s.score));
+
+            // Get all moves with maximum score
+            const bestMoves = scoredMoves.filter(s => s.score === maxScore);
+
+            // Pick random from best moves
+            return bestMoves[Math.floor(Math.random() * bestMoves.length)].move;
+        }
+
+        // Drifter: Momentum-based wandering
+        function algorithmDrifter(validMoves) {
+            // 70% chance to continue in same direction if valid
+            if (lastMoveDirection && Math.random() < 0.7) {
+                const continueMove = validMoves.find(move =>
+                    move.row === lastMoveDirection.row && move.col === lastMoveDirection.col
+                );
+
+                if (continueMove) {
+                    return continueMove;
+                }
+            }
+
+            // Otherwise pick random
+            return validMoves[Math.floor(Math.random() * validMoves.length)];
+        }
+
         function moveGnome() {
             if (!currentField || currentFieldSize === 0 || gnomeStatus === 'dead') return;
 
@@ -1039,10 +1471,40 @@
             // If no valid moves, stay in place
             if (validMoves.length === 0) return;
 
-            // Pick a random valid move
-            const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
-            gnomePosition.row += randomMove.row;
-            gnomePosition.col += randomMove.col;
+            // Select move using current algorithm
+            let selectedMove;
+            switch(explorationAlgorithm) {
+                case 'wanderer':
+                    selectedMove = algorithmWanderer(validMoves);
+                    break;
+                case 'brave':
+                    selectedMove = algorithmBrave(validMoves);
+                    break;
+                case 'treasure-hunter':
+                    selectedMove = algorithmTreasureHunter(validMoves);
+                    break;
+                case 'scaredy-cat':
+                    selectedMove = algorithmScaredyCat(validMoves);
+                    break;
+                case 'scout':
+                    selectedMove = algorithmScout(validMoves);
+                    break;
+                case 'drifter':
+                    selectedMove = algorithmDrifter(validMoves);
+                    break;
+                default:
+                    selectedMove = algorithmWanderer(validMoves);
+            }
+
+            // Apply the move
+            gnomePosition.row += selectedMove.row;
+            gnomePosition.col += selectedMove.col;
+
+            // Store direction for Drifter algorithm
+            lastMoveDirection = selectedMove;
+
+            // Update memory
+            updateGnomeMemory();
 
             // Increment step counter
             stepCounter++;
@@ -1073,6 +1535,9 @@
 
                 // Remove the flower from the field
                 currentField[gnomePosition.row][gnomePosition.col] = 0;
+
+                // Remove from memory
+                knownFlowers.delete(`${gnomePosition.row},${gnomePosition.col}`);
 
                 // Reset status after animation
                 setTimeout(() => {
@@ -1267,6 +1732,11 @@
             }
         }
 
+        function updateAlgorithm() {
+            explorationAlgorithm = document.getElementById('explorationAlgo').value;
+            // No need to restart - will take effect on next move
+        }
+
         function toggleHelp() {
             const modal = document.getElementById('helpModal');
             modal.classList.add('active');
@@ -1296,6 +1766,21 @@
         function stopGnomeMovement() {
             clearInterval(gnomeTimer);
             gnomeTimer = null;
+        }
+
+        // Get Minesweeper-style color for bomb counts
+        function getBombCountColor(count) {
+            const colors = {
+                1: '#0000FF', // Blue
+                2: '#008000', // Green
+                3: '#FF0000', // Red
+                4: '#000080', // Dark Blue
+                5: '#800000', // Maroon
+                6: '#008080', // Teal
+                7: '#000000', // Black
+                8: '#808080'  // Gray
+            };
+            return colors[count] || '#000000';
         }
 
         function renderField(field, title) {
@@ -1328,6 +1813,9 @@
                         }
                     }
 
+                    const cellKey = `${i},${j}`;
+                    const isRevealed = revealedCells.has(cellKey);
+
                     // Check if gnome is at this position
                     if (gnomePosition.row === i && gnomePosition.col === j) {
                         cell.className += ` cell-gnome ${gnomeStatus}`;
@@ -1348,19 +1836,33 @@
                         const opacity = (ghostTrailIndex + 1) / positionHistory.length;
                         cell.className += ' cell-ghost-trail';
                         cell.style.opacity = opacity * 0.5; // Max 0.5 opacity for newest trail
+                    } else if (!isRevealed) {
+                        // FOG OF WAR: Unrevealed cells are hidden
+                        cell.className += ' cell-hidden';
+                        cell.textContent = '?';
                     } else if (field[i][j] === 1) {
+                        // Revealed bomb
                         cell.className += ' cell-bomb';
                         cell.textContent = '💣';
                     } else if (field[i][j] === 2) {
+                        // Revealed regular flower
                         cell.className += ' cell-flower';
                         cell.textContent = '🌸';
                     } else if (field[i][j] === 4) {
-                        // Feature 3: Phoenix Flower
+                        // Revealed phoenix flower
                         cell.className += ' cell-phoenix-flower';
                         cell.textContent = '🌺';
                     } else {
+                        // Revealed empty cell - show bomb count
                         cell.className += ' cell-empty';
-                        cell.textContent = '';
+                        const bombCount = cellBombCounts.get(cellKey) || 0;
+                        if (bombCount > 0) {
+                            cell.textContent = bombCount.toString();
+                            cell.style.color = getBombCountColor(bombCount);
+                            cell.style.fontWeight = 'bold';
+                        } else {
+                            cell.textContent = '';
+                        }
                     }
 
                     fieldGrid.appendChild(cell);
@@ -1463,9 +1965,23 @@
                 clearInterval(invincibilityTimer);
                 invincibilityTimer = null;
 
+                // Reset algorithm memory
+                visitedCells = new Set();
+                knownBombs = new Set();
+                knownFlowers = new Set();
+                lastMoveDirection = null;
+
+                // Reset fog of war
+                revealedCells = new Set();
+                cellBombCounts = new Map();
+
                 // Store current field for gnome movement
                 currentField = bombField;
                 currentFieldSize = size;
+
+                // Initialize memory with starting position
+                visitedCells.add(`${gnomePosition.row},${gnomePosition.col}`);
+                updateGnomeMemory(); // This will reveal the starting cell
                 
                 const results = document.getElementById('results');
                 results.style.display = 'block';
